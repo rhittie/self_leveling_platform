@@ -53,10 +53,12 @@
 #define MAX_CORRECTION_STEPS 50      // Max steps per correction cycle
 
 // PI Controller Defaults
-#define DEFAULT_KP_PITCH 2.0f
-#define DEFAULT_KI_PITCH 0.1f
-#define DEFAULT_KP_ROLL 2.0f
-#define DEFAULT_KI_ROLL 0.1f
+// Tuned for ~0.0004 deg/step pitch, ~0.00087 deg/step roll (combined differential)
+// With stepsPerDegree=60: 1° roll error → 30 steps, 1° pitch error → 60 steps (clipped to 50)
+#define DEFAULT_KP_PITCH 1.0f
+#define DEFAULT_KI_PITCH 0.05f
+#define DEFAULT_KP_ROLL 0.5f
+#define DEFAULT_KI_ROLL 0.03f
 
 // Integral windup limits
 #define INTEGRAL_LIMIT 100.0f
@@ -83,7 +85,9 @@
 // ============================================================================
 
 // Complementary filter coefficient (0-1, higher = trust accelerometer more)
-#define COMPLEMENTARY_ALPHA 0.02f
+// 0.02 was too sluggish — took 15+ seconds to converge
+// 0.15 converges in ~1-2 seconds, still smooths motor vibration
+#define COMPLEMENTARY_ALPHA 0.15f
 
 // Motion detection thresholds
 #define MOTION_ACCEL_THRESHOLD 0.15f  // g units

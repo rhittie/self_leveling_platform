@@ -1,7 +1,7 @@
 #include "LevelingController.h"
 
 LevelingController::LevelingController()
-    : _stepsPerDegree(10.0f)  // Default: 10 steps per degree of correction
+    : _stepsPerDegree(60.0f)  // Steps per degree of PI output (~1/deg-per-step for roll axis)
 {
     _pitchController.kp = DEFAULT_KP_PITCH;
     _pitchController.ki = DEFAULT_KI_PITCH;
@@ -24,10 +24,17 @@ void LevelingController::begin() {
 MotorCorrection LevelingController::calculate(float pitch, float roll) {
     MotorCorrection correction;
 
-    // Target is level (0 degrees)
-    // Error = target - actual = -actual (since target = 0)
-    float pitchError = -pitch;
-    float rollError = -roll;
+    // Error sign: positive error means positive angle needs correction.
+    // Our motor mapping has NEGATIVE plant gain (positive steps decrease angles),
+    // so we use error = +actual to get net negative feedback.
+    //
+    // Measured: M1 +steps → pitch -0.22, roll +0.42
+    //           M2 +steps → pitch -0.20, roll -0.45
+    // Motor mapping below: M1 = pitch - roll, M2 = pitch + roll
+    // For roll>0: M1 goes negative (dRoll negative ✓), M2 goes positive (dRoll negative ✓)
+    // For pitch>0: both go positive (dPitch negative ✓)
+    float pitchError = pitch;
+    float rollError = roll;
 
     // Calculate PI outputs
     float pitchOutput = calculatePI(_pitchController, pitchError);

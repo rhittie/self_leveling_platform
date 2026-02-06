@@ -72,7 +72,7 @@ self_leveing_prism/
 - [x] Dashboard GUI tab with bubble level and motor position bars
 
 **What's In Progress:**
-- [ ] Determine correct INVERT_PITCH / INVERT_ROLL values (needs hardware testing)
+- (none)
 
 **What's Broken:**
 - (none)
@@ -88,12 +88,14 @@ self_leveing_prism/
 7. IMU axis inversion flags for orientation fix - 2026-02-06
 8. Dashboard GUI with bubble level + motor position bars - 2026-02-06
 9. Motor position reporting in stream/logging + mpos/mreset commands - 2026-02-06
+10. PI controller error sign fix + gain tuning for hardware - 2026-02-06
+11. Complementary filter alpha 0.02→0.15 for faster convergence - 2026-02-06
 
 ## Next Steps
 
-1. [ ] Hardware test: determine correct INVERT_PITCH / INVERT_ROLL values
-2. [ ] Set up Notion sync (optional - requires API key)
-3. [ ] Hardware assembly and first real-world test
+1. [ ] Add serial command to start leveling (currently requires button press)
+2. [ ] Full closed-loop leveling test with button press
+3. [ ] Set up Notion sync (optional - requires API key)
 
 ## Decisions Made
 
@@ -108,6 +110,11 @@ self_leveing_prism/
 | ±2048 default limits (1 rev) | Prevents unscrewing legs; configurable in config.h | 2026-02-06 |
 | IMU inversion at sensor level | All consumers get correct angles; flags in config.h | 2026-02-06 |
 | Dashboard as first GUI tab | Most-used diagnostic view should be immediately visible | 2026-02-06 |
+| Complementary alpha 0.02→0.15 | Old value too sluggish (15+s convergence); 0.15 gives 95% in ~4s | 2026-02-06 |
+
+| PI error sign = +actual (not -actual) | Plant has negative gain (positive steps decrease angles); error=actual gives net negative feedback | 2026-02-06 |
+| PI gains: Kp_pitch=1.0, Kp_roll=0.5 | Pitch ~2x less effective per step than roll; stepsPerDegree=60 | 2026-02-06 |
+| INVERT_PITCH/ROLL both false | Hardware test confirmed IMU reads correct signs; fix was in PI error sign | 2026-02-06 |
 
 ## Known Issues & Bugs
 
@@ -122,18 +129,18 @@ self_leveing_prism/
 Motor safety limits, IMU orientation fix, and Dashboard GUI
 
 **Where We Left Off:**
-Implemented three features in one session:
-1. **Motor safety limits** — `stepMotor1()`/`stepMotor2()` silently refuse to step past ±2048 (config.h: `MOTOR_MIN_POSITION`/`MOTOR_MAX_POSITION`). Limits enforced at lowest level so all callers are guarded.
-2. **IMU inversion flags** — `INVERT_PITCH`/`INVERT_ROLL` in config.h (both default `false`). Applied in `processData()` (accel angles) and `applyComplementaryFilter()` (gyro rates). Use dashboard bubble level to visually determine correct values.
-3. **Dashboard GUI** — New first tab in `tools/test_mode_gui.py` with bubble level (250x250 canvas, green/orange/red dot), motor position bars (blue/red at limit), and control buttons (Start/Stop Streaming, Query/Reset Motor Positions). Parses `[IMU]`, continuous log, and `[MPOS]` lines via regex.
-4. **Firmware streaming** — Stream lines now include `M1:{pos} M2:{pos}`. New commands: `mpos` (query positions+limits) and `mreset` (reset counters).
+Fixed PI controller and tuned gains. Full hardware testing done.
 
-Build verified clean: `pio run` SUCCESS.
+1. **PI error sign fix** — Original code had `error = -actual` which caused positive feedback. Fixed to `error = actual` to account for negative plant gain (positive motor steps decrease angles).
+2. **PI gains tuned** — Kp_pitch=1.0, Ki_pitch=0.05, Kp_roll=0.5, Ki_roll=0.03, stepsPerDegree=60
+3. **INVERT flags** — Both false. IMU reads correct signs; the bug was in the controller.
+4. **Verified** — 20-cycle correction test with M1+2000 initial tilt showed roll correctly converging (0.787 to 0.460 over cycles). Motor positions moving in expected directions.
+5. **Motor mapping** — M1: dP=-0.22, dR=+0.42 | M2: dP=-0.20, dR=-0.45 per 1000 steps
 
 **What Needs to Happen Next:**
-- Upload to ESP32 and test with hardware
-- Use bubble level to determine if INVERT_PITCH/INVERT_ROLL need flipping
-- Verify motor limits work (try `m1 3000`, should stop at 2048)
+- Full closed-loop test (requires button press to enter LEVELING state)
+- Consider adding serial command to start leveling for easier testing
+- Fine-tune gains based on closed-loop behavior
 
 **Important Context:**
 This is a PlatformIO ESP32 project. Build with `pio run`, upload with `pio run -t upload`.
