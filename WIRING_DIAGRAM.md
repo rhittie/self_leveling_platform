@@ -172,7 +172,7 @@ Orientation: antenna/chip at top, USB connector at bottom, looking down at the t
   Button                  ESP32 Dev Kit V1
   +------+                +--------------------+
   |      |                |                    |
-  | Leg1 o--------------->| D33    (Left 7)    |
+  | Leg1 o--------------->| D32    (Left 6)    |
   | Leg2 o--------------->| GND    (Left 14)   |
   |      |                |                    |
   +------+                +--------------------+
@@ -180,7 +180,7 @@ Orientation: antenna/chip at top, USB connector at bottom, looking down at the t
 
 | Button Pin | ESP32 Physical Pin | Board Label | GPIO |
 |------------|--------------------|-------------|------|
-| Leg 1 | Left Pin 7 | D33 | GPIO 33 |
+| Leg 1 | Left Pin 6 | D32 | GPIO 32 |
 | Leg 2 | Left Pin 14 | GND | Ground |
 
 > No external resistor needed - uses the ESP32's internal pull-up.
@@ -236,7 +236,7 @@ No external wiring. The onboard LED is hard-wired to GPIO 2 (Right Pin 12 / D2).
 | 4 | Right | 11 | D4 | ULN2003 #2 IN2 | Motor 2 coil B |
 | 13 | **Left** | **13** | D13 | ULN2003 #2 IN3 | Motor 2 coil C |
 | 15 | Right | 13 | D15 | ULN2003 #2 IN4 | Motor 2 coil D |
-| 33 | Left | 7 | D33 | Push Button | User input |
+| 32 | Left | 6 | D32 | Push Button | User input |
 | 2 | Right | 12 | D2 | Onboard LED | Status indicator |
 | -- | Right | 15 | 3V3 | MPU6050 VCC | 3.3V sensor power |
 | -- | Left | 15 | VIN | DC Converter 5V | Board power input |
@@ -259,17 +259,16 @@ Pins marked with `[*]` are used in this project. Unused pins are `[ ]`.
    Left 3  [ ] | [ VN/39 ]           [ TX0  ] | [ ]  Right 3
    Left 4  [ ] | [ D34  ]            [ RX0  ] | [ ]  Right 4
    Left 5  [ ] | [ D35  ]            [ D21  ] | [*]  Right 5      MPU6050 SDA
-   Left 6  [ ] | [ D32  ]            [ D19  ] | [*]  Right 6      Motor1 IN1
-   Left 7  [*] | [ D33  ]            [ D18  ] | [*]  Right 7      Motor1 IN2
-   Left 8  [ ] | [ D25  ]            [ D5   ] | [*]  Right 8      Button
-   Left 9  [ ] | [ D26  ]            [ D17  ] | [*]  Right 9      Motor1 IN3
-   Left 10 [ ] | [ D27  ]            [ D16  ] | [*]  Right 10     Motor1 IN4
-   Left 11 [ ] | [ D14  ]            [ D4   ] | [*]  Right 11     Motor2 IN1
-   Left 12 [ ] | [ D12  ]            [ D2   ] | [*]  Right 12     Motor2 IN2
-   Left 13 [*] | [ D13  ]            [ D15  ] | [*]  Right 13     LED, Motor2 IN3
-   Left 14 [*] | [ GND  ]            [ GND  ] | [*]  Right 14     Motor2 IN4
-   Left 15 [*] | [ VIN  ]            [ 3V3  ] | [*]  Right 15     GND bus x2
-               |                                  |                VIN + 3V3
+   Left 6  [*] | [ D32  ]            [ D19  ] | [*]  Right 6      Motor1 IN1 / Button(L)
+   Left 7  [ ] | [ D33  ]            [ D18  ] | [*]  Right 7      Motor1 IN2
+   Left 8  [ ] | [ D25  ]            [ D5   ] | [*]  Right 8      Motor1 IN3
+   Left 9  [ ] | [ D26  ]            [ D17  ] | [*]  Right 9      Motor1 IN4
+   Left 10 [ ] | [ D27  ]            [ D16  ] | [*]  Right 10     Motor2 IN1
+   Left 11 [ ] | [ D14  ]            [ D4   ] | [*]  Right 11     Motor2 IN2
+   Left 12 [ ] | [ D12  ]            [ D2   ] | [*]  Right 12     LED
+   Left 13 [*] | [ D13  ]            [ D15  ] | [*]  Right 13     Motor2 IN3(L) / IN4
+   Left 14 [*] | [ GND  ]            [ GND  ] | [*]  Right 14     GND bus x2
+   Left 15 [*] | [ VIN  ]            [ 3V3  ] | [*]  Right 15     VIN + 3V3
                +----------+-----------+----------+
                           | [  USB  ] |
                           +-----------+

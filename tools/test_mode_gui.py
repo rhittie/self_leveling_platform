@@ -13,6 +13,8 @@ import serial.tools.list_ports
 import threading
 import queue
 import time
+import re
+import math
 
 
 class TestModeGUI:
@@ -41,6 +43,14 @@ class TestModeGUI:
         self.motor2_continuous = False
         self.led_cycling = False
 
+        # Live dashboard data
+        self.live_pitch = 0.0
+        self.live_roll = 0.0
+        self.live_m1_pos = 0
+        self.live_m2_pos = 0
+        self.motor_min = -2048
+        self.motor_max = 2048
+
         self.setup_ui()
         self.refresh_ports()
 
@@ -59,22 +69,25 @@ class TestModeGUI:
         self.setup_connection_frame(main_frame)
 
         # Create notebook for organized tabs
-        notebook = ttk.Notebook(main_frame)
-        notebook.grid(row=1, column=0, sticky="nsew", pady=(10, 0))
+        self.notebook = ttk.Notebook(main_frame)
+        self.notebook.grid(row=1, column=0, sticky="nsew", pady=(10, 0))
         main_frame.rowconfigure(1, weight=1)
         main_frame.columnconfigure(0, weight=1)
 
-        # Create tabs
-        motors_frame = ttk.Frame(notebook, padding="10")
-        imu_frame = ttk.Frame(notebook, padding="10")
-        led_button_frame = ttk.Frame(notebook, padding="10")
-        system_frame = ttk.Frame(notebook, padding="10")
+        # Create tabs - Dashboard first
+        dashboard_frame = ttk.Frame(self.notebook, padding="10")
+        motors_frame = ttk.Frame(self.notebook, padding="10")
+        imu_frame = ttk.Frame(self.notebook, padding="10")
+        led_button_frame = ttk.Frame(self.notebook, padding="10")
+        system_frame = ttk.Frame(self.notebook, padding="10")
 
-        notebook.add(motors_frame, text="Motors")
-        notebook.add(imu_frame, text="IMU / MPU6050")
-        notebook.add(led_button_frame, text="LED & Button")
-        notebook.add(system_frame, text="System")
+        self.notebook.add(dashboard_frame, text="Dashboard")
+        self.notebook.add(motors_frame, text="Motors")
+        self.notebook.add(imu_frame, text="IMU / MPU6050")
+        self.notebook.add(led_button_frame, text="LED & Button")
+        self.notebook.add(system_frame, text="System")
 
+        self.setup_dashboard_tab(dashboard_frame)
         self.setup_motors_tab(motors_frame)
         self.setup_imu_tab(imu_frame)
         self.setup_led_button_tab(led_button_frame)
@@ -118,6 +131,257 @@ class TestModeGUI:
         self.test_mode_btn.grid(row=0, column=8, padx=5)
         ttk.Button(conn_frame, text="Exit Test Mode",
                    command=lambda: self.send_command("exit")).grid(row=0, column=9, padx=5)
+
+    # ==================== Dashboard Tab ====================
+
+    def setup_dashboard_tab(self, parent):
+        """Setup the dashboard tab with bubble level and motor position bars."""
+        parent.columnconfigure(0, weight=1)
+        parent.columnconfigure(1, weight=1)
+        parent.rowconfigure(0, weight=1)
+
+        # Left side: Bubble level
+        level_frame = ttk.LabelFrame(parent, text="Bubble Level", padding="10")
+        level_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+
+        self.bubble_canvas = tk.Canvas(level_frame, width=250, height=250,
+                                        bg="white", highlightthickness=1,
+                                        highlightbackground="gray")
+        self.bubble_canvas.pack(pady=5)
+
+        # Pitch/Roll numeric readouts
+        readout_frame = ttk.Frame(level_frame)
+        readout_frame.pack(pady=5)
+        ttk.Label(readout_frame, text="Pitch:", font=("Consolas", 10)).grid(row=0, column=0, padx=5)
+        self.pitch_label = ttk.Label(readout_frame, text="0.00°", font=("Consolas", 10, "bold"))
+        self.pitch_label.grid(row=0, column=1, padx=5)
+        ttk.Label(readout_frame, text="Roll:", font=("Consolas", 10)).grid(row=1, column=0, padx=5)
+        self.roll_label = ttk.Label(readout_frame, text="0.00°", font=("Consolas", 10, "bold"))
+        self.roll_label.grid(row=1, column=1, padx=5)
+
+        # Right side: Motor position bars
+        motor_frame = ttk.LabelFrame(parent, text="Motor Positions", padding="10")
+        motor_frame.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
+
+        self.motor_canvas = tk.Canvas(motor_frame, width=250, height=250,
+                                       bg="white", highlightthickness=1,
+                                       highlightbackground="gray")
+        self.motor_canvas.pack(pady=5)
+
+        # Motor position readouts
+        mreadout_frame = ttk.Frame(motor_frame)
+        mreadout_frame.pack(pady=5)
+        ttk.Label(mreadout_frame, text="M1:", font=("Consolas", 10)).grid(row=0, column=0, padx=5)
+        self.m1_pos_label = ttk.Label(mreadout_frame, text="0 steps", font=("Consolas", 10, "bold"))
+        self.m1_pos_label.grid(row=0, column=1, padx=5)
+        ttk.Label(mreadout_frame, text="M2:", font=("Consolas", 10)).grid(row=1, column=0, padx=5)
+        self.m2_pos_label = ttk.Label(mreadout_frame, text="0 steps", font=("Consolas", 10, "bold"))
+        self.m2_pos_label.grid(row=1, column=1, padx=5)
+
+        # Control buttons
+        ctrl_frame = ttk.Frame(parent)
+        ctrl_frame.grid(row=1, column=0, columnspan=2, sticky="ew", padx=5, pady=5)
+
+        self.dash_stream_btn = ttk.Button(ctrl_frame, text="Start Streaming",
+                                           command=self.toggle_streaming)
+        self.dash_stream_btn.pack(side="left", padx=5)
+
+        ttk.Button(ctrl_frame, text="Query Motor Positions",
+                   command=lambda: self.send_command("mpos")).pack(side="left", padx=5)
+
+        ttk.Button(ctrl_frame, text="Reset Motor Positions",
+                   command=lambda: self.send_command("mreset")).pack(side="left", padx=5)
+
+        # Draw initial state
+        self.draw_bubble_level()
+        self.draw_motor_bars()
+
+    def draw_bubble_level(self):
+        """Draw the bubble level visualization."""
+        c = self.bubble_canvas
+        c.delete("all")
+        w, h = 250, 250
+        cx, cy = w // 2, h // 2
+        radius = 100
+
+        # Outer circle
+        c.create_oval(cx - radius, cy - radius, cx + radius, cy + radius,
+                      outline="black", width=2)
+
+        # Crosshairs
+        c.create_line(cx - radius, cy, cx + radius, cy, fill="gray", dash=(4, 4))
+        c.create_line(cx, cy - radius, cx, cy + radius, fill="gray", dash=(4, 4))
+
+        # Tolerance ring (0.5 degrees maps to small circle)
+        tol_radius = int(radius * 0.5 / 15.0)  # 15 deg = full radius
+        if tol_radius < 3:
+            tol_radius = 3
+        c.create_oval(cx - tol_radius, cy - tol_radius, cx + tol_radius, cy + tol_radius,
+                      outline="green", width=1, dash=(3, 3))
+
+        # Bubble dot position: map pitch/roll to pixel offset
+        # Clamp to ±15 degrees for display
+        max_angle = 15.0
+        px = self.live_roll / max_angle * radius
+        py = -self.live_pitch / max_angle * radius  # Negative: pitch up = dot moves up
+
+        # Clamp to circle
+        dist = math.sqrt(px * px + py * py)
+        if dist > radius - 8:
+            scale = (radius - 8) / dist
+            px *= scale
+            py *= scale
+
+        # Color based on distance from center
+        angle_mag = math.sqrt(self.live_pitch ** 2 + self.live_roll ** 2)
+        if angle_mag < 0.5:
+            color = "#00cc00"  # Green - level
+        elif angle_mag < 2.0:
+            color = "#ff8800"  # Orange - close
+        else:
+            color = "#cc0000"  # Red - far off
+
+        dot_r = 8
+        dot_x = cx + px
+        dot_y = cy + py
+        c.create_oval(dot_x - dot_r, dot_y - dot_r, dot_x + dot_r, dot_y + dot_r,
+                      fill=color, outline="black", width=1)
+
+        # Center dot
+        c.create_oval(cx - 2, cy - 2, cx + 2, cy + 2, fill="black")
+
+    def draw_motor_bars(self):
+        """Draw motor position bar charts."""
+        c = self.motor_canvas
+        c.delete("all")
+        w, h = 250, 250
+
+        bar_width = 50
+        bar_height = 200
+        margin_top = 20
+        gap = 60  # space between bars
+
+        for i, (pos, label) in enumerate([(self.live_m1_pos, "M1"), (self.live_m2_pos, "M2")]):
+            bx = 40 + i * (bar_width + gap)
+            by = margin_top
+
+            # Bar outline
+            c.create_rectangle(bx, by, bx + bar_width, by + bar_height,
+                               outline="black", width=1)
+
+            # Center line (position 0)
+            center_y = by + bar_height // 2
+            c.create_line(bx - 5, center_y, bx + bar_width + 5, center_y,
+                          fill="black", width=1)
+
+            # Fill based on position
+            total_range = self.motor_max - self.motor_min
+            if total_range == 0:
+                total_range = 1
+
+            # Normalize position to 0..1 range within min..max
+            norm_pos = (pos - self.motor_min) / total_range
+            fill_y = by + bar_height * (1.0 - norm_pos)
+
+            # Determine color
+            at_limit = (pos <= self.motor_min or pos >= self.motor_max)
+            fill_color = "#cc0000" if at_limit else "#3366cc"
+
+            # Draw fill from center to current position
+            if pos >= 0:
+                c.create_rectangle(bx + 1, fill_y, bx + bar_width - 1, center_y,
+                                   fill=fill_color, outline="")
+            else:
+                c.create_rectangle(bx + 1, center_y, bx + bar_width - 1, fill_y,
+                                   fill=fill_color, outline="")
+
+            # Label
+            c.create_text(bx + bar_width // 2, by + bar_height + 15,
+                          text=label, font=("Consolas", 10, "bold"))
+
+            # Position value
+            pos_text = f"{pos}"
+            if pos >= self.motor_max:
+                pos_text += " [MAX]"
+            elif pos <= self.motor_min:
+                pos_text += " [MIN]"
+            c.create_text(bx + bar_width // 2, by - 10,
+                          text=pos_text, font=("Consolas", 8))
+
+            # Min/Max labels on the sides
+            if i == 0:
+                c.create_text(bx - 10, by, text=str(self.motor_max),
+                              font=("Consolas", 7), anchor="e")
+                c.create_text(bx - 10, by + bar_height, text=str(self.motor_min),
+                              font=("Consolas", 7), anchor="e")
+                c.create_text(bx - 10, center_y, text="0",
+                              font=("Consolas", 7), anchor="e")
+
+    def parse_stream_data(self, line):
+        """Parse incoming serial data for dashboard updates."""
+        # Parse [IMU] stream lines:
+        # [IMU] P:1.23 R:-0.45 | Ax:... | ... | M1:100 M2:-50
+        imu_match = re.match(
+            r'\[IMU\]\s+P:([-\d.]+)\s+R:([-\d.]+).*M1:([-\d]+)\s+M2:([-\d]+)',
+            line
+        )
+        if imu_match:
+            self.live_pitch = float(imu_match.group(1))
+            self.live_roll = float(imu_match.group(2))
+            self.live_m1_pos = int(imu_match.group(3))
+            self.live_m2_pos = int(imu_match.group(4))
+            return True
+
+        # Parse continuous logging lines:
+        # P:1.23 R:-0.45 M:0 M1:100 M2:-50
+        log_match = re.match(
+            r'P:([-\d.]+)\s+R:([-\d.]+)\s+M:\d+\s+M1:([-\d]+)\s+M2:([-\d]+)',
+            line
+        )
+        if log_match:
+            self.live_pitch = float(log_match.group(1))
+            self.live_roll = float(log_match.group(2))
+            self.live_m1_pos = int(log_match.group(3))
+            self.live_m2_pos = int(log_match.group(4))
+            return True
+
+        # Parse [MPOS] response:
+        # [MPOS] M1:100 M2:-50 MIN:-2048 MAX:2048
+        mpos_match = re.match(
+            r'\[MPOS\]\s+M1:([-\d]+)\s+M2:([-\d]+)\s+MIN:([-\d]+)\s+MAX:([-\d]+)',
+            line
+        )
+        if mpos_match:
+            self.live_m1_pos = int(mpos_match.group(1))
+            self.live_m2_pos = int(mpos_match.group(2))
+            self.motor_min = int(mpos_match.group(3))
+            self.motor_max = int(mpos_match.group(4))
+            return True
+
+        return False
+
+    def update_dashboard(self):
+        """Redraw dashboard visualizations with current data."""
+        self.draw_bubble_level()
+        self.draw_motor_bars()
+        self.pitch_label.config(text=f"{self.live_pitch:.2f}°")
+        self.roll_label.config(text=f"{self.live_roll:.2f}°")
+
+        m1_text = f"{self.live_m1_pos} steps"
+        m2_text = f"{self.live_m2_pos} steps"
+        if self.live_m1_pos >= self.motor_max:
+            m1_text += " [MAX LIMIT]"
+        elif self.live_m1_pos <= self.motor_min:
+            m1_text += " [MIN LIMIT]"
+        if self.live_m2_pos >= self.motor_max:
+            m2_text += " [MAX LIMIT]"
+        elif self.live_m2_pos <= self.motor_min:
+            m2_text += " [MIN LIMIT]"
+
+        self.m1_pos_label.config(text=m1_text)
+        self.m2_pos_label.config(text=m2_text)
+
+    # ==================== Existing Tabs ====================
 
     def setup_motors_tab(self, parent):
         """Setup motor control tab."""
@@ -280,7 +544,7 @@ class TestModeGUI:
                                         command=self.toggle_button_test)
         self.btn_test_btn.pack(pady=10)
 
-        ttk.Label(btn_frame, text="Events:\n• SHORT_PRESS\n• LONG_PRESS (2+ seconds)",
+        ttk.Label(btn_frame, text="Events:\n  SHORT_PRESS\n  LONG_PRESS (2+ seconds)",
                   justify="left", foreground="gray").pack(pady=10)
 
     def setup_system_tab(self, parent):
@@ -427,12 +691,18 @@ class TestModeGUI:
 
     def process_queue(self):
         """Process messages from the read thread."""
+        dashboard_updated = False
         try:
             while True:
                 message = self.message_queue.get_nowait()
                 self.log_output(message)
+                if self.parse_stream_data(message.strip()):
+                    dashboard_updated = True
         except queue.Empty:
             pass
+
+        if dashboard_updated:
+            self.update_dashboard()
 
         # Schedule next check
         self.root.after(50, self.process_queue)
@@ -507,6 +777,7 @@ class TestModeGUI:
         self.m1c_btn.config(text=f"Continuous: {'ON' if self.motor1_continuous else 'OFF'}")
         self.m2c_btn.config(text=f"Continuous: {'ON' if self.motor2_continuous else 'OFF'}")
         self.stream_btn.config(text=f"Stream: {'ON' if self.imu_streaming else 'OFF'}")
+        self.dash_stream_btn.config(text=f"{'Stop Streaming' if self.imu_streaming else 'Start Streaming'}")
         self.btn_test_btn.config(text=f"Button Test: {'ON' if self.button_test else 'OFF'}")
         self.led_cycle_btn.config(text=f"{'Stop Cycling' if self.led_cycling else 'Cycle All Patterns'}")
 

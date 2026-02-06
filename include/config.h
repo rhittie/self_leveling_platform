@@ -23,7 +23,7 @@
 #define MOTOR2_IN4 15
 
 // User Interface
-#define PIN_BUTTON 33
+#define PIN_BUTTON 32
 #define PIN_LED 2  // Onboard LED
 
 // ============================================================================
@@ -74,6 +74,10 @@
 #define MOTOR_DIR_RAISE 1
 #define MOTOR_DIR_LOWER -1
 
+// Position safety limits (±1 revolution to prevent unscrewing legs)
+#define MOTOR_MIN_POSITION -2048
+#define MOTOR_MAX_POSITION 2048
+
 // ============================================================================
 // IMU Parameters
 // ============================================================================
@@ -84,6 +88,10 @@
 // Motion detection thresholds
 #define MOTION_ACCEL_THRESHOLD 0.15f  // g units
 #define MOTION_GYRO_THRESHOLD 10.0f   // degrees/second
+
+// Axis inversion flags (set true if axis reads opposite to expected direction)
+#define INVERT_PITCH false
+#define INVERT_ROLL false
 
 // Calibration samples
 #define CALIBRATION_SAMPLES 200

@@ -178,8 +178,9 @@ void loop() {
         static unsigned long lastLogTime = 0;
         if (currentTime - lastLogTime >= 100) {  // 10 Hz logging
             lastLogTime = currentTime;
-            Serial.printf("P:%.2f R:%.2f M:%d\n",
-                          imu.getPitch(), imu.getRoll(), imu.isMoving() ? 1 : 0);
+            Serial.printf("P:%.2f R:%.2f M:%d M1:%ld M2:%ld\n",
+                          imu.getPitch(), imu.getRoll(), imu.isMoving() ? 1 : 0,
+                          motors.getPosition1(), motors.getPosition2());
         }
     }
 }
@@ -562,6 +563,7 @@ void printTestModeMenu() {
     Serial.println("===========================================");
     Serial.println("Commands:");
     Serial.println("  Motors:  m1/m2 <steps>, m1c, m2c, mstop, mspeed <rpm>");
+    Serial.println("           mpos (query positions), mreset (reset to zero)");
     Serial.println("  IMU:     scan, imu, read, stream, cal, raw");
     Serial.println("  Button:  btn (then press button to see events)");
     Serial.println("  LED:     led on/off/slow/fast/pulse/error/cycle");
@@ -647,10 +649,11 @@ void handleTestModeState() {
         testModeLastStreamTime = currentTime;
         imu.update();
         const IMUData& data = imu.getData();
-        Serial.printf("[IMU] P:%.2f R:%.2f | Ax:%.3f Ay:%.3f Az:%.3f | Gx:%.1f Gy:%.1f Gz:%.1f\n",
+        Serial.printf("[IMU] P:%.2f R:%.2f | Ax:%.3f Ay:%.3f Az:%.3f | Gx:%.1f Gy:%.1f Gz:%.1f | M1:%ld M2:%ld\n",
                       data.pitch, data.roll,
                       data.accelX, data.accelY, data.accelZ,
-                      data.gyroX, data.gyroY, data.gyroZ);
+                      data.gyroX, data.gyroY, data.gyroZ,
+                      motors.getPosition1(), motors.getPosition2());
     }
 
     // Handle continuous motor rotation
@@ -866,6 +869,21 @@ void handleTestModeCommands(String& input) {
         testModeMotor2Continuous = false;
         motors.release();
         Serial.println("All motors stopped.");
+        return;
+    }
+
+    // mpos - query motor positions and limits
+    if (input.equalsIgnoreCase("mpos")) {
+        Serial.printf("[MPOS] M1:%ld M2:%ld MIN:%ld MAX:%ld\n",
+                      motors.getPosition1(), motors.getPosition2(),
+                      motors.getMinPosition(), motors.getMaxPosition());
+        return;
+    }
+
+    // mreset - reset motor position counters to zero
+    if (input.equalsIgnoreCase("mreset")) {
+        motors.resetPositions();
+        Serial.println("[MRESET] Motor positions reset to 0");
         return;
     }
 

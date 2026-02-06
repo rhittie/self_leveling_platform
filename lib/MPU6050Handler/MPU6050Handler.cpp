@@ -178,6 +178,10 @@ void MPU6050Handler::processData() {
     // Roll: rotation around Y axis (left/right tilt)
     _accelPitch = atan2(_data.accelY, sqrt(_data.accelX * _data.accelX + _data.accelZ * _data.accelZ)) * RAD_TO_DEG;
     _accelRoll = atan2(-_data.accelX, _data.accelZ) * RAD_TO_DEG;
+
+    // Apply axis inversion if configured
+    if (INVERT_PITCH) _accelPitch = -_accelPitch;
+    if (INVERT_ROLL) _accelRoll = -_accelRoll;
 }
 
 void MPU6050Handler::applyComplementaryFilter(float dt) {
@@ -187,9 +191,11 @@ void MPU6050Handler::applyComplementaryFilter(float dt) {
     //
     // filtered_angle = alpha * accel_angle + (1 - alpha) * (prev_angle + gyro_rate * dt)
 
-    // Integrate gyroscope rates
-    float gyroPitch = _data.pitch + _data.gyroX * dt;
-    float gyroRoll = _data.roll + _data.gyroY * dt;
+    // Integrate gyroscope rates (apply inversion to match accel axes)
+    float gyroRatePitch = INVERT_PITCH ? -_data.gyroX : _data.gyroX;
+    float gyroRateRoll = INVERT_ROLL ? -_data.gyroY : _data.gyroY;
+    float gyroPitch = _data.pitch + gyroRatePitch * dt;
+    float gyroRoll = _data.roll + gyroRateRoll * dt;
 
     // Apply complementary filter
     _data.pitch = COMPLEMENTARY_ALPHA * _accelPitch + (1.0f - COMPLEMENTARY_ALPHA) * gyroPitch;

@@ -72,6 +72,22 @@ public:
      */
     void resetPositions();
 
+    /**
+     * Check if motor 1 is at a position limit
+     */
+    bool isAtLimit1() const;
+
+    /**
+     * Check if motor 2 is at a position limit
+     */
+    bool isAtLimit2() const;
+
+    /**
+     * Get position limits
+     */
+    long getMinPosition() const { return _minPosition; }
+    long getMaxPosition() const { return _maxPosition; }
+
 private:
     // Motor pin arrays
     const uint8_t _motor1Pins[4] = {MOTOR1_IN1, MOTOR1_IN2, MOTOR1_IN3, MOTOR1_IN4};
@@ -93,6 +109,8 @@ private:
     uint8_t _stepIndex2;  // Current step in sequence for motor 2
     long _position1;      // Cumulative position for motor 1
     long _position2;      // Cumulative position for motor 2
+    long _minPosition;    // Minimum allowed position
+    long _maxPosition;    // Maximum allowed position
     unsigned long _stepDelayUs;  // Delay between steps in microseconds
 
     /**

@@ -5,6 +5,8 @@ StepperController::StepperController()
     , _stepIndex2(0)
     , _position1(0)
     , _position2(0)
+    , _minPosition(MOTOR_MIN_POSITION)
+    , _maxPosition(MOTOR_MAX_POSITION)
     , _stepDelayUs(STEP_DELAY_US)
 {
 }
@@ -117,7 +119,19 @@ void StepperController::resetPositions() {
     _position2 = 0;
 }
 
+bool StepperController::isAtLimit1() const {
+    return _position1 <= _minPosition || _position1 >= _maxPosition;
+}
+
+bool StepperController::isAtLimit2() const {
+    return _position2 <= _minPosition || _position2 >= _maxPosition;
+}
+
 void StepperController::stepMotor1(int direction) {
+    // Enforce position limits
+    if (direction > 0 && _position1 >= _maxPosition) return;
+    if (direction < 0 && _position1 <= _minPosition) return;
+
     // Update step index
     if (direction > 0) {
         _stepIndex1 = (_stepIndex1 + 1) % 8;
@@ -133,6 +147,10 @@ void StepperController::stepMotor1(int direction) {
 }
 
 void StepperController::stepMotor2(int direction) {
+    // Enforce position limits
+    if (direction > 0 && _position2 >= _maxPosition) return;
+    if (direction < 0 && _position2 <= _minPosition) return;
+
     // Update step index
     if (direction > 0) {
         _stepIndex2 = (_stepIndex2 + 1) % 8;
