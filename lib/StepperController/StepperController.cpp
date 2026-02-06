@@ -83,9 +83,18 @@ void StepperController::moveBoth(int steps1, int steps2) {
 }
 
 void StepperController::applyCorrection(const MotorCorrection& correction) {
-    // Clamp steps to maximum per cycle
-    int steps1 = constrain(correction.motor1Steps, -MAX_CORRECTION_STEPS, MAX_CORRECTION_STEPS);
-    int steps2 = constrain(correction.motor2Steps, -MAX_CORRECTION_STEPS, MAX_CORRECTION_STEPS);
+    int steps1 = correction.motor1Steps;
+    int steps2 = correction.motor2Steps;
+
+    // Proportional scaling: if either motor exceeds the limit, scale BOTH
+    // so the ratio is preserved. This keeps the roll differential intact
+    // even when pitch correction saturates.
+    int maxAbs = max(abs(steps1), abs(steps2));
+    if (maxAbs > MAX_CORRECTION_STEPS) {
+        float scale = (float)MAX_CORRECTION_STEPS / maxAbs;
+        steps1 = (int)(steps1 * scale);
+        steps2 = (int)(steps2 * scale);
+    }
 
     moveBoth(steps1, steps2);
 }

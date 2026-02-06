@@ -88,6 +88,11 @@ public:
     long getMinPosition() const { return _minPosition; }
     long getMaxPosition() const { return _maxPosition; }
 
+    /**
+     * Set position limits (for finding physical extents in test mode)
+     */
+    void setLimits(long minPos, long maxPos) { _minPosition = minPos; _maxPosition = maxPos; }
+
 private:
     // Motor pin arrays
     const uint8_t _motor1Pins[4] = {MOTOR1_IN1, MOTOR1_IN2, MOTOR1_IN3, MOTOR1_IN4};

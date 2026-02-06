@@ -43,6 +43,8 @@ unsigned long stateEnteredTime = 0;
 unsigned long lastLevelCheckTime = 0;
 unsigned long lastIMUUpdateTime = 0;
 unsigned long lastStableTime = 0;
+unsigned long levelSinceTime = 0;        // When platform first entered tolerance
+bool withinTolerance = false;            // Currently within level tolerance
 
 // ============================================================================
 // Test Mode Variables
@@ -216,6 +218,7 @@ void changeState(SystemState newState) {
         case SystemState::LEVELING:
             statusLED.setPattern(LEDPattern::FAST_BLINK);
             leveling.reset();  // Reset PI integrators
+            withinTolerance = false;  // Reset level confirmation
             break;
 
         case SystemState::LEVEL_OK:
@@ -314,19 +317,31 @@ void handleLevelingState() {
         float pitch = imu.getPitch();
         float roll = imu.getRoll();
 
-        // Check if already level
+        // Check if within tolerance
         if (imu.isLevel(config.levelTolerance)) {
-            Serial.printf("Level achieved! Pitch=%.2f, Roll=%.2f\n", pitch, roll);
-            changeState(SystemState::LEVEL_OK);
-            return;
-        }
+            if (!withinTolerance) {
+                // Just entered tolerance - start timing
+                withinTolerance = true;
+                levelSinceTime = currentTime;
+            } else if (currentTime - levelSinceTime >= LEVEL_CONFIRM_MS) {
+                // Sustained level for required duration - confirm level
+                Serial.printf("Level achieved! Pitch=%.2f, Roll=%.2f (stable for %dms)\n",
+                              pitch, roll, LEVEL_CONFIRM_MS);
+                changeState(SystemState::LEVEL_OK);
+                return;
+            }
+            // Within tolerance but still confirming - don't apply correction
+        } else {
+            // Outside tolerance - reset confirmation timer
+            withinTolerance = false;
 
-        // Calculate and apply correction
-        MotorCorrection correction = leveling.calculate(pitch, roll);
+            // Calculate and apply correction
+            MotorCorrection correction = leveling.calculate(pitch, roll);
 
-        // Only move motors if correction is significant
-        if (abs(correction.motor1Steps) > 0 || abs(correction.motor2Steps) > 0) {
-            motors.applyCorrection(correction);
+            // Only move motors if correction is significant
+            if (abs(correction.motor1Steps) > 0 || abs(correction.motor2Steps) > 0) {
+                motors.applyCorrection(correction);
+            }
         }
     }
 }
@@ -346,8 +361,8 @@ void handleLevelOkState() {
             return;
         }
 
-        // Check if still level
-        if (!imu.isLevel(config.levelTolerance * 2)) {  // Use wider tolerance to avoid oscillation
+        // Check if still level (use 1.5x tolerance for hysteresis to avoid oscillation)
+        if (!imu.isLevel(config.levelTolerance * 1.5f)) {
             Serial.println("Platform no longer level - adjusting...");
             changeState(SystemState::LEVELING);
         }
@@ -421,8 +436,19 @@ void handleSerialCommands() {
 
         case 'l':
         case 'L':
-            config.continuousLogging = !config.continuousLogging;
-            Serial.printf("Continuous logging: %s\n", config.continuousLogging ? "ON" : "OFF");
+            // "level" command: start leveling from IDLE (like button press)
+            if (input.equalsIgnoreCase("level")) {
+                if (currentState == SystemState::IDLE) {
+                    Serial.println("Starting leveling via serial command...");
+                    changeState(SystemState::INITIALIZING);
+                } else {
+                    Serial.printf("Cannot start leveling from %s state. Reset first.\n",
+                                  stateToString(currentState));
+                }
+            } else {
+                config.continuousLogging = !config.continuousLogging;
+                Serial.printf("Continuous logging: %s\n", config.continuousLogging ? "ON" : "OFF");
+            }
             break;
 
         case 'm':
@@ -509,6 +535,7 @@ void printHelp() {
     Serial.println("  p <kp> <ki> - Set PI gains");
     Serial.println("  t <deg>   - Set level tolerance");
     Serial.println("  l         - Toggle continuous logging");
+    Serial.println("  level     - Start leveling (same as button press)");
     Serial.println();
     Serial.println("  admin     - Enter ADMIN TEST MODE");
     Serial.println("  test      - Enter ADMIN TEST MODE");
@@ -884,6 +911,20 @@ void handleTestModeCommands(String& input) {
     if (input.equalsIgnoreCase("mreset")) {
         motors.resetPositions();
         Serial.println("[MRESET] Motor positions reset to 0");
+        return;
+    }
+
+    // munlock - remove position limits (for finding physical extents)
+    if (input.equalsIgnoreCase("munlock")) {
+        motors.setLimits(-99999, 99999);
+        Serial.println("[MUNLOCK] Position limits removed (-99999 to 99999)");
+        return;
+    }
+
+    // mlock - restore default position limits
+    if (input.equalsIgnoreCase("mlock")) {
+        motors.setLimits(MOTOR_MIN_POSITION, MOTOR_MAX_POSITION);
+        Serial.printf("[MLOCK] Position limits restored (%d to %d)\n", MOTOR_MIN_POSITION, MOTOR_MAX_POSITION);
         return;
     }
 

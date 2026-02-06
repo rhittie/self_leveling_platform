@@ -51,6 +51,7 @@
 
 #define LEVEL_TOLERANCE_DEG 0.5f     // Acceptable angle deviation
 #define MAX_CORRECTION_STEPS 50      // Max steps per correction cycle
+#define LEVEL_CONFIRM_MS 2000        // Must stay within tolerance this long before LEVEL_OK
 
 // PI Controller Defaults
 // Tuned for ~0.0004 deg/step pitch, ~0.00087 deg/step roll (combined differential)
@@ -76,9 +77,9 @@
 #define MOTOR_DIR_RAISE 1
 #define MOTOR_DIR_LOWER -1
 
-// Position safety limits (±1 revolution to prevent unscrewing legs)
-#define MOTOR_MIN_POSITION -2048
-#define MOTOR_MAX_POSITION 2048
+// Position safety limits (physical travel of threaded rod legs)
+#define MOTOR_MIN_POSITION 0
+#define MOTOR_MAX_POSITION 70000
 
 // ============================================================================
 // IMU Parameters
