@@ -952,6 +952,39 @@ void handleTestModeCommands(String& input) {
         Serial.println("[MRESET] Motor positions reset to 0");
         return;
     }
+    if (input.equalsIgnoreCase("mreset1")) {
+        motors.resetPosition1();
+        Serial.printf("[MRESET] M1 reset to 0 (M2 still at %ld)\n", motors.getPosition2());
+        return;
+    }
+    if (input.equalsIgnoreCase("mreset2")) {
+        motors.resetPosition2();
+        Serial.printf("[MRESET] M2 reset to 0 (M1 still at %ld)\n", motors.getPosition1());
+        return;
+    }
+
+    // coiltest - energize each Motor 2 coil one at a time to verify wiring
+    if (input.equalsIgnoreCase("coiltest")) {
+        Serial.println("Motor 2 coil test - energizing each pin for 1 second:");
+        uint8_t pins[] = {MOTOR2_IN1, MOTOR2_IN2, MOTOR2_IN3, MOTOR2_IN4};
+        const char* names[] = {"IN1", "IN2", "IN3", "IN4"};
+
+        // Make sure all are LOW first
+        for (int i = 0; i < 4; i++) digitalWrite(pins[i], LOW);
+
+        for (int i = 0; i < 4; i++) {
+            Serial.printf("  %s (GPIO %d) HIGH... ", names[i], pins[i]);
+            digitalWrite(pins[i], HIGH);
+            delay(1000);
+            digitalWrite(pins[i], LOW);
+            Serial.println("done");
+            delay(300);
+        }
+        Serial.println("Coil test complete.");
+        Serial.println("Expected order: feel 4 distinct click/hums in sequence.");
+        Serial.println("If two adjacent coils feel the same, those pins may be swapped.");
+        return;
+    }
 
     // munlock - remove position limits (for finding physical extents)
     if (input.equalsIgnoreCase("munlock")) {

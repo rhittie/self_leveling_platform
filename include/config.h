@@ -18,9 +18,9 @@
 
 // Stepper Motor 2 (Right Back Leg)
 #define MOTOR2_IN1 16
-#define MOTOR2_IN2 4
-#define MOTOR2_IN3 13
-#define MOTOR2_IN4 15
+#define MOTOR2_IN2 13
+#define MOTOR2_IN3 15
+#define MOTOR2_IN4 4
 
 // User Interface
 #define PIN_BUTTON 32

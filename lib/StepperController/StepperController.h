@@ -71,6 +71,8 @@ public:
      * Reset position counters to zero
      */
     void resetPositions();
+    void resetPosition1() { _position1 = 0; }
+    void resetPosition2() { _position2 = 0; }
 
     /**
      * Check if motor 1 is at a position limit

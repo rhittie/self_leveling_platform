@@ -9,7 +9,6 @@ from tkinter import ttk, messagebox
 import serial
 import serial.tools.list_ports
 import threading
-import queue
 import re
 import time
 
@@ -18,15 +17,12 @@ class MotorLimitsGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Motor Limits Setup")
-        self.root.resizable(False, False)
+        self.root.resizable(True, True)
+        self.root.minsize(500, 600)
         self.ser = None
         self.connected = False
         self.busy = False
-
-        # Serial command queue - all serial ops go through worker thread
-        self.cmd_queue = queue.Queue()
-        self.worker_thread = None
-        self.worker_running = False
+        self.serial_lock = threading.Lock()
 
         # Limits storage
         self.m1_pos = tk.IntVar(value=0)
@@ -37,6 +33,9 @@ class MotorLimitsGUI:
         self.m2_out = tk.StringVar(value="--")
         self.step_amount = tk.IntVar(value=100)
         self.status_msg = tk.StringVar(value="Disconnected")
+
+        self.root.columnconfigure(0, weight=1)
+        self.root.rowconfigure(6, weight=1)  # Log panel row stretches
 
         self._build_ui()
 
@@ -61,24 +60,36 @@ class MotorLimitsGUI:
         step_frame = ttk.LabelFrame(self.root, text="Step Amount", padding=8)
         step_frame.grid(row=1, column=0, columnspan=2, padx=8, pady=4, sticky="ew")
 
-        for i, val in enumerate([10, 50, 100, 500, 1000]):
+        for i, val in enumerate([100, 500, 1000, 5000, 10000]):
             ttk.Radiobutton(step_frame, text=str(val), variable=self.step_amount,
                             value=val).grid(row=0, column=i, padx=6)
 
         ttk.Label(step_frame, text="Custom:").grid(row=0, column=5, padx=(12, 2))
-        self.custom_steps = ttk.Entry(step_frame, width=6)
+        self.custom_steps = ttk.Entry(step_frame, width=8)
         self.custom_steps.grid(row=0, column=6)
         ttk.Button(step_frame, text="Set", command=self._set_custom_steps).grid(row=0, column=7, padx=2)
 
+        # Both Motors
+        both_frame = ttk.LabelFrame(self.root, text="Both Motors", padding=8)
+        both_frame.grid(row=2, column=0, columnspan=2, padx=8, pady=4, sticky="ew")
+
+        both_btn_frame = ttk.Frame(both_frame)
+        both_btn_frame.pack()
+
+        tk.Button(both_btn_frame, text="  -  ", font=("", 14, "bold"), bg="#ff6b6b", fg="white",
+                  command=lambda: self._move_both(-1)).grid(row=0, column=0, padx=8)
+        tk.Button(both_btn_frame, text="  +  ", font=("", 14, "bold"), bg="#51cf66", fg="white",
+                  command=lambda: self._move_both(1)).grid(row=0, column=1, padx=8)
+
         # Motor 1
-        self._build_motor_frame("Motor 1 (Left Back)", 2, self.m1_pos, self.m1_in, self.m1_out, 1)
+        self._build_motor_frame("Motor 1 (Left Back)", 3, self.m1_pos, self.m1_in, self.m1_out, 1)
 
         # Motor 2
-        self._build_motor_frame("Motor 2 (Right Back)", 3, self.m2_pos, self.m2_in, self.m2_out, 2)
+        self._build_motor_frame("Motor 2 (Right Back)", 4, self.m2_pos, self.m2_in, self.m2_out, 2)
 
         # Summary
         summary = ttk.LabelFrame(self.root, text="Config Values", padding=8)
-        summary.grid(row=4, column=0, columnspan=2, padx=8, pady=4, sticky="ew")
+        summary.grid(row=5, column=0, columnspan=2, padx=8, pady=4, sticky="ew")
 
         self.summary_text = tk.Text(summary, height=4, width=55, font=("Consolas", 10), state="disabled")
         self.summary_text.grid(row=0, column=0, columnspan=2)
@@ -86,17 +97,19 @@ class MotorLimitsGUI:
 
         # Log panel
         log_frame = ttk.LabelFrame(self.root, text="Serial Log", padding=4)
-        log_frame.grid(row=5, column=0, columnspan=2, padx=8, pady=4, sticky="ew")
+        log_frame.grid(row=6, column=0, columnspan=2, padx=8, pady=4, sticky="nsew")
+        log_frame.columnconfigure(0, weight=1)
+        log_frame.rowconfigure(0, weight=1)
 
         self.log_text = tk.Text(log_frame, height=8, width=55, font=("Consolas", 9), state="disabled")
-        self.log_text.grid(row=0, column=0, sticky="ew")
+        self.log_text.grid(row=0, column=0, sticky="nsew")
         scrollbar = ttk.Scrollbar(log_frame, orient="vertical", command=self.log_text.yview)
         scrollbar.grid(row=0, column=1, sticky="ns")
         self.log_text.config(yscrollcommand=scrollbar.set)
 
         # Reset button
         ttk.Button(self.root, text="Reset Positions to 0", command=self._reset_positions).grid(
-            row=6, column=0, columnspan=2, pady=8)
+            row=7, column=0, columnspan=2, pady=8)
 
     def _build_motor_frame(self, title, row, pos_var, in_var, out_var, motor_num):
         frame = ttk.LabelFrame(self.root, text=title, padding=10)
@@ -115,9 +128,12 @@ class MotorLimitsGUI:
                               command=lambda: self._move_motor(motor_num, -1))
         minus_btn.grid(row=0, column=0, padx=8)
 
+        tk.Button(btn_frame, text="Set Zero", font=("", 10), bg="#868e96", fg="white",
+                  command=lambda: self._reset_single_motor(motor_num)).grid(row=0, column=1, padx=8)
+
         plus_btn = tk.Button(btn_frame, text="  +  ", font=("", 14, "bold"), bg="#51cf66", fg="white",
                              command=lambda: self._move_motor(motor_num, 1))
-        plus_btn.grid(row=0, column=1, padx=8)
+        plus_btn.grid(row=0, column=2, padx=8)
 
         # Limit buttons
         limit_frame = ttk.Frame(frame)
@@ -148,54 +164,7 @@ class MotorLimitsGUI:
             self.log_text.config(state="disabled")
         self.root.after(0, do_log)
 
-    # ==================== Serial Worker ====================
-
-    def _start_worker(self):
-        self.worker_running = True
-        self.worker_thread = threading.Thread(target=self._worker_loop, daemon=True)
-        self.worker_thread.start()
-
-    def _stop_worker(self):
-        self.worker_running = False
-        self.cmd_queue.put(None)
-
-    def _worker_loop(self):
-        while self.worker_running:
-            try:
-                item = self.cmd_queue.get(timeout=0.5)
-            except queue.Empty:
-                continue
-            if item is None:
-                break
-            cmd, wait, callback = item
-            try:
-                self._log(f">> {cmd}")
-                lines = self._send_raw(cmd, wait)
-                for l in lines:
-                    self._log(f"<< {l}")
-                if callback:
-                    self.root.after(0, callback, lines)
-            except Exception as e:
-                self._log(f"ERROR: {e}")
-                self.root.after(0, self._on_serial_error, str(e))
-
-    def _send_raw(self, cmd, wait=0.5):
-        if not self.ser or not self.ser.is_open:
-            return []
-        # Drain stale data
-        while self.ser.in_waiting:
-            self.ser.readline()
-        self.ser.write(f"{cmd}\n".encode())
-        time.sleep(wait)
-        lines = []
-        while self.ser.in_waiting:
-            line = self.ser.readline().decode("utf-8", errors="replace").strip()
-            if line:
-                lines.append(line)
-        return lines
-
-    def _queue_cmd(self, cmd, wait=0.5, callback=None):
-        self.cmd_queue.put((cmd, wait, callback))
+    # ==================== Serial ====================
 
     def _on_serial_error(self, msg):
         self.status_msg.set(f"Error: {msg}")
@@ -219,6 +188,23 @@ class MotorLimitsGUI:
         else:
             self._connect()
 
+    def _send_direct(self, cmd, wait=0.5):
+        """Send a command directly and return response lines. Thread-safe via lock."""
+        if not self.ser or not self.ser.is_open:
+            return []
+        with self.serial_lock:
+            self.ser.reset_input_buffer()
+            self._log(f">> {cmd}")
+            self.ser.write(f"{cmd}\n".encode())
+            time.sleep(wait)
+            lines = []
+            while self.ser.in_waiting:
+                line = self.ser.readline().decode("utf-8", errors="replace").strip()
+                if line:
+                    lines.append(line)
+                    self._log(f"<< {line}")
+            return lines
+
     def _connect(self):
         port = self.port_var.get()
         if not port:
@@ -229,44 +215,61 @@ class MotorLimitsGUI:
         self.status_label.config(foreground="orange")
         self.root.update()
 
-        try:
-            self.ser = serial.Serial(port, 115200, timeout=0.5)
-            self._log(f"Opened {port}, waiting for boot...")
-            # Wait for ESP32 boot (setup() has delay(1000) + init time)
-            time.sleep(3)
-            # Drain all boot messages
-            while self.ser.in_waiting:
-                line = self.ser.readline().decode("utf-8", errors="replace").strip()
-                if line:
-                    self._log(f"boot: {line}")
-            time.sleep(0.5)
-            while self.ser.in_waiting:
-                line = self.ser.readline().decode("utf-8", errors="replace").strip()
-                if line:
-                    self._log(f"boot: {line}")
+        def do_connect():
+            try:
+                self.ser = serial.Serial(port, 115200, timeout=0.5)
+                self._log(f"Opened {port}, waiting for boot...")
+                time.sleep(3)
+                # Drain boot messages
+                while self.ser.in_waiting:
+                    line = self.ser.readline().decode("utf-8", errors="replace").strip()
+                    if line:
+                        self._log(f"boot: {line}")
+                time.sleep(0.5)
+                while self.ser.in_waiting:
+                    line = self.ser.readline().decode("utf-8", errors="replace").strip()
+                    if line:
+                        self._log(f"boot: {line}")
 
-            # Start the worker thread
-            self._start_worker()
+                # All setup commands sent directly - no worker thread
+                self._send_direct("r", 0.5)
+                self._send_direct("admin", 1.0)
+                self._send_direct("munlock", 0.5)
+                lines = self._send_direct("mpos", 0.5)
 
-            # First reset to IDLE in case we're in some other state
-            self._queue_cmd("r", 0.5)
-            # Enter test mode
-            self._queue_cmd("admin", 1.0)
-            # Init IMU
-            self._queue_cmd("imu", 2.0)
-            # Unlock motor position limits so we can find physical extents
-            self._queue_cmd("munlock", 0.5)
-            # Query positions to verify communication
-            self._queue_cmd("mpos", 0.5, self._on_connect_mpos)
+                # Parse mpos response
+                found = False
+                for l in lines:
+                    m = re.match(r'\[MPOS\]\s+M1:([-\d]+)\s+M2:([-\d]+)', l)
+                    if m:
+                        def update(m1=int(m.group(1)), m2=int(m.group(2))):
+                            self.m1_pos.set(m1)
+                            self.m2_pos.set(m2)
+                            self.status_msg.set(f"Connected  |  M1:{m1}  M2:{m2}")
+                            self.status_label.config(foreground="green")
+                            self.connected = True
+                            self.connect_btn.config(text="Disconnect")
+                            self._log("Connection verified - test mode active")
+                        self.root.after(0, update)
+                        found = True
 
-            self.connected = True
-            self.connect_btn.config(text="Disconnect")
+                if not found:
+                    def warn():
+                        self.status_msg.set("Connected (no MPOS response)")
+                        self.status_label.config(foreground="orange")
+                        self.connected = True
+                        self.connect_btn.config(text="Disconnect")
+                    self.root.after(0, warn)
 
-        except Exception as e:
-            self._log(f"Connection failed: {e}")
-            messagebox.showerror("Connection Error", str(e))
-            self.status_msg.set("Disconnected")
-            self.status_label.config(foreground="red")
+            except Exception as e:
+                self._log(f"Connection failed: {e}")
+                def show_err():
+                    messagebox.showerror("Connection Error", str(e))
+                    self.status_msg.set("Disconnected")
+                    self.status_label.config(foreground="red")
+                self.root.after(0, show_err)
+
+        threading.Thread(target=do_connect, daemon=True).start()
 
     def _on_connect_mpos(self, lines):
         """Verify connection by checking mpos response."""
@@ -287,11 +290,10 @@ class MotorLimitsGUI:
             self._log("WARNING: No [MPOS] in response - may not be in test mode")
 
     def _disconnect(self):
-        if self.connected:
-            self._stop_worker()
         if self.ser:
             try:
-                self._send_raw("exit", 0.5)
+                self.ser.write(b"exit\n")
+                time.sleep(0.5)
                 self.ser.close()
             except:
                 pass
@@ -314,10 +316,50 @@ class MotorLimitsGUI:
         self.status_msg.set(f"Ready  |  M1:{self.m1_pos.get()}  M2:{self.m2_pos.get()}")
         self.status_label.config(foreground="green")
 
-    def _on_move_done(self, lines):
-        self._queue_cmd("mpos", 0.5, self._on_mpos_response)
+    def _on_move_done(self, motor_num, steps):
+        """Update position client-side instead of querying serial."""
+        def handler(lines):
+            if motor_num == 1:
+                self.m1_pos.set(self.m1_pos.get() + steps)
+            else:
+                self.m2_pos.set(self.m2_pos.get() + steps)
+            self.busy = False
+            self.status_msg.set(f"Ready  |  M1:{self.m1_pos.get()}  M2:{self.m2_pos.get()}")
+            self.status_label.config(foreground="green")
+        return handler
 
     # ==================== Commands ====================
+
+    def _move_both(self, direction):
+        if not self.connected:
+            messagebox.showwarning("Not Connected", "Connect first")
+            return
+        if self.busy:
+            return
+        self.busy = True
+        steps = self.step_amount.get() * direction
+        # Motor 2 is physically reversed
+        steps_m2 = -steps
+        wait = max(0.5, abs(steps) * 0.003)
+        self.status_msg.set(f"Moving both motors {steps:+d} steps...")
+        self.status_label.config(foreground="orange")
+
+        def do_move():
+            try:
+                self._send_direct(f"m1 {steps}", wait)
+                self._send_direct(f"m2 {steps_m2}", wait)
+                def update_ui():
+                    self.m1_pos.set(self.m1_pos.get() + steps)
+                    self.m2_pos.set(self.m2_pos.get() + steps)  # Display matches M1 direction
+                    self.busy = False
+                    self.status_msg.set(f"Ready  |  M1:{self.m1_pos.get()}  M2:{self.m2_pos.get()}")
+                    self.status_label.config(foreground="green")
+                self.root.after(0, update_ui)
+            except Exception as e:
+                self._log(f"ERROR: {e}")
+                self.root.after(0, lambda: self._on_serial_error(str(e)))
+
+        threading.Thread(target=do_move, daemon=True).start()
 
     def _move_motor(self, motor_num, direction):
         if not self.connected:
@@ -326,11 +368,42 @@ class MotorLimitsGUI:
         if self.busy:
             return
         self.busy = True
+        # Motor 2 direction is physically reversed (lead screw orientation)
+        display_direction = direction
+        if motor_num == 2:
+            direction = -direction
         steps = self.step_amount.get() * direction
+        display_steps = self.step_amount.get() * display_direction
         wait = max(0.5, abs(steps) * 0.003)
         self.status_msg.set(f"Moving M{motor_num} {steps:+d} steps...")
         self.status_label.config(foreground="orange")
-        self._queue_cmd(f"m{motor_num} {steps}", wait, self._on_move_done)
+
+        def do_move():
+            try:
+                cmd = f"m{motor_num} {steps}"
+                self._log(f">> {cmd}")
+                self.ser.reset_input_buffer()
+                self.ser.write(f"{cmd}\n".encode())
+                time.sleep(wait)
+                while self.ser.in_waiting:
+                    line = self.ser.readline().decode("utf-8", errors="replace").strip()
+                    if line:
+                        self._log(f"<< {line}")
+                # Update position client-side
+                def update_ui():
+                    if motor_num == 1:
+                        self.m1_pos.set(self.m1_pos.get() + display_steps)
+                    else:
+                        self.m2_pos.set(self.m2_pos.get() + display_steps)
+                    self.busy = False
+                    self.status_msg.set(f"Ready  |  M1:{self.m1_pos.get()}  M2:{self.m2_pos.get()}")
+                    self.status_label.config(foreground="green")
+                self.root.after(0, update_ui)
+            except Exception as e:
+                self._log(f"ERROR: {e}")
+                self.root.after(0, lambda: self._on_serial_error(str(e)))
+
+        threading.Thread(target=do_move, daemon=True).start()
 
     def _set_limit(self, motor_num, which):
         if motor_num == 1:
@@ -350,15 +423,36 @@ class MotorLimitsGUI:
     def _set_custom_steps(self):
         try:
             val = int(self.custom_steps.get())
-            if 1 <= val <= 10000:
+            if 1 <= val <= 100000:
                 self.step_amount.set(val)
         except ValueError:
             pass
 
-    def _reset_positions(self):
-        if not self.connected:
+    def _reset_single_motor(self, motor_num):
+        if not self.connected or self.busy:
             return
-        self._queue_cmd("mreset", 0.5, self._on_mpos_response)
+        def do_reset():
+            self._send_direct(f"mreset{motor_num}", 0.5)
+            def update_ui():
+                if motor_num == 1:
+                    self.m1_pos.set(0)
+                else:
+                    self.m2_pos.set(0)
+                self.status_msg.set(f"Ready  |  M1:{self.m1_pos.get()}  M2:{self.m2_pos.get()}")
+            self.root.after(0, update_ui)
+        threading.Thread(target=do_reset, daemon=True).start()
+
+    def _reset_positions(self):
+        if not self.connected or self.busy:
+            return
+        def do_reset():
+            self._send_direct("mreset", 0.5)
+            def update_ui():
+                self.m1_pos.set(0)
+                self.m2_pos.set(0)
+                self.status_msg.set("Ready  |  M1:0  M2:0")
+            self.root.after(0, update_ui)
+        threading.Thread(target=do_reset, daemon=True).start()
 
     # ==================== Summary ====================
 
