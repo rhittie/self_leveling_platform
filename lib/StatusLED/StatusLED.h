@@ -5,85 +5,82 @@
 #include "config.h"
 #include "types.h"
 
+// RGB color (0-255 per channel)
+struct RGBColor {
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
+};
+
+// Predefined colors for each state
+namespace LEDColors {
+    constexpr RGBColor OFF       = {0,   0,   0};
+    constexpr RGBColor RED       = {255, 0,   0};
+    constexpr RGBColor GREEN     = {0,   255, 0};
+    constexpr RGBColor BLUE      = {0,   0,   255};
+    constexpr RGBColor YELLOW    = {255, 180, 0};
+    constexpr RGBColor CYAN      = {0,   200, 255};
+    constexpr RGBColor PURPLE    = {180, 0,   255};
+    constexpr RGBColor WHITE     = {255, 255, 255};
+}
+
 /**
- * StatusLED - Controls onboard LED with various blink patterns
+ * StatusLED - Controls an RGB LED with blink patterns and state colors
+ *
+ * Uses ESP32 LEDC PWM for smooth color mixing.
+ * Falls back to single-pin mode if constructed with one pin.
  *
  * Patterns:
  * - OFF: LED always off
- * - SOLID: LED always on
- * - SLOW_BLINK: 1 Hz (500ms on/off)
- * - FAST_BLINK: 4 Hz (125ms on/off)
+ * - SOLID: LED always on (in current color)
+ * - SLOW_BLINK: 1 Hz
+ * - FAST_BLINK: 4 Hz
  * - DOUBLE_PULSE: Two quick pulses every 2 seconds
- * - ERROR_BLINK: 10 Hz (50ms on/off)
+ * - ERROR_BLINK: 10 Hz
  */
 class StatusLED {
 public:
-    /**
-     * Constructor
-     * @param pin GPIO pin for LED
-     * @param activeLow true if LED is on when pin is LOW
-     */
+    // Single-pin constructor (backward compatible, onboard LED)
     StatusLED(uint8_t pin, bool activeLow = false);
 
-    /**
-     * Initialize LED pin
-     */
-    void begin();
+    // RGB constructor (3-pin, common cathode)
+    StatusLED(uint8_t pinRed, uint8_t pinGreen, uint8_t pinBlue);
 
-    /**
-     * Update LED state - call frequently in main loop
-     */
+    void begin();
     void update();
 
-    /**
-     * Set the current LED pattern
-     * @param pattern Pattern to display
-     */
     void setPattern(LEDPattern pattern);
-
-    /**
-     * Get current pattern
-     */
     LEDPattern getPattern() const { return _pattern; }
 
-    /**
-     * Force LED on (temporarily overrides pattern)
-     */
+    // Set the color used for the current pattern
+    void setColor(RGBColor color);
+    RGBColor getColor() const { return _color; }
+
     void forceOn();
-
-    /**
-     * Force LED off (temporarily overrides pattern)
-     */
     void forceOff();
-
-    /**
-     * Resume pattern after force on/off
-     */
     void resumePattern();
 
 private:
-    uint8_t _pin;
+    // Pin config
+    uint8_t _pin;          // Single-pin mode
+    uint8_t _pinR, _pinG, _pinB;  // RGB mode
     bool _activeLow;
+    bool _rgbMode;
+
+    // State
     LEDPattern _pattern;
-
-    bool _ledState;           // Current LED state
-    bool _forceOverride;      // Force mode active
+    RGBColor _color;
+    bool _ledState;        // On or off (for blink timing)
+    bool _forceOverride;
     unsigned long _lastToggleTime;
-    uint8_t _pulsePhase;      // For double pulse pattern
+    uint8_t _pulsePhase;
 
-    /**
-     * Set the physical LED state
-     */
+    // Output control
     void setLED(bool on);
+    void writeRGB(uint8_t r, uint8_t g, uint8_t b);
 
-    /**
-     * Update blink pattern timing
-     */
+    // Pattern timing
     void updateBlink(unsigned long period);
-
-    /**
-     * Update double pulse pattern
-     */
     void updateDoublePulse();
 };
 

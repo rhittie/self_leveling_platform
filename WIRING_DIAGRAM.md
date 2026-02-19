@@ -8,7 +8,7 @@
 | 2 | MPU6050 IMU Module | 6-axis accelerometer + gyroscope |
 | 3 | 28BYJ-48 Stepper Motor 1 + ULN2003 Driver | Left back leg |
 | 4 | 28BYJ-48 Stepper Motor 2 + ULN2003 Driver | Right back leg |
-| 5 | Momentary Push Button | User input |
+| 5 | Momentary Push Button with RGB LED | User input + status indicator |
 | 6 | DC Power Converter (DWEII) | 5V power supply |
 
 ---
@@ -166,31 +166,46 @@ Orientation: antenna/chip at top, USB connector at bottom, looking down at the t
 
 ---
 
-### 4. Push Button --> ESP32
+### 4. Push Button with RGB LED --> ESP32
 
 ```
-  Button                  ESP32 Dev Kit V1
-  +------+                +--------------------+
-  |      |                |                    |
-  | Leg1 o--------------->| D32    (Left 6)    |
-  | Leg2 o--------------->| GND    (Left 14)   |
-  |      |                |                    |
-  +------+                +--------------------+
+  RGB Push Button         ESP32 Dev Kit V1
+  +-------------+         +--------------------+
+  |             |         |                    |
+  | Leg1 (btn) o-------->| D32    (Left 6)    |
+  | Leg2 (btn) o-------->| GND    (Left 14)   |
+  |             |         |                    |
+  | Red wire   o-------->| D25    (Left 8)    |
+  | Green wire o-------->| D26    (Left 9)    |
+  | Blue wire  o-------->| D27    (Left 10)   |
+  | Black wire o-------->| GND    (Left 14)   |
+  |             |         |                    |
+  +-------------+         +--------------------+
 ```
 
-| Button Pin | ESP32 Physical Pin | Board Label | GPIO |
-|------------|--------------------|-------------|------|
-| Leg 1 | Left Pin 6 | D32 | GPIO 32 |
-| Leg 2 | Left Pin 14 | GND | Ground |
+| Button/LED Pin | ESP32 Physical Pin | Board Label | GPIO |
+|----------------|--------------------|-------------|------|
+| Button Leg 1 | Left Pin 6 | D32 | GPIO 32 |
+| Button Leg 2 | Left Pin 14 | GND | Ground |
+| Red wire | Left Pin 8 | D25 | GPIO 25 |
+| Green wire | Left Pin 9 | D26 | GPIO 26 |
+| Blue wire | Left Pin 10 | D27 | GPIO 27 |
+| Black wire | Left Pin 14 | GND | Ground |
 
-> No external resistor needed - uses the ESP32's internal pull-up.
+> No external resistor needed for button - uses the ESP32's internal pull-up.
 > Button pressed = LOW, released = HIGH.
+> RGB LED uses PWM (LEDC) for color mixing. All three color pins are on the left side (pins 8-10).
 
----
-
-### 5. Onboard LED (built into ESP32)
-
-No external wiring. The onboard LED is hard-wired to GPIO 2 (Right Pin 12 / D2).
+**State color mapping:**
+| System State | LED Color | Pattern |
+|--------------|-----------|---------|
+| IDLE | Off | Off |
+| INITIALIZING | Blue | Slow blink (1 Hz) |
+| WAIT_FOR_STABLE | Yellow | Solid |
+| LEVELING | Cyan | Fast blink (4 Hz) |
+| LEVEL_OK | Green | Double pulse |
+| ERROR | Red | Fast blink (10 Hz) |
+| TEST_MODE | Purple | Solid |
 
 ---
 
@@ -237,7 +252,9 @@ No external wiring. The onboard LED is hard-wired to GPIO 2 (Right Pin 12 / D2).
 | 13 | **Left** | **13** | D13 | ULN2003 #2 IN3 | Motor 2 coil C |
 | 15 | Right | 13 | D15 | ULN2003 #2 IN4 | Motor 2 coil D |
 | 32 | Left | 6 | D32 | Push Button | User input |
-| 2 | Right | 12 | D2 | Onboard LED | Status indicator |
+| 25 | Left | 8 | D25 | RGB LED Red | Status color (PWM) |
+| 26 | Left | 9 | D26 | RGB LED Green | Status color (PWM) |
+| 27 | Left | 10 | D27 | RGB LED Blue | Status color (PWM) |
 | -- | Right | 15 | 3V3 | MPU6050 VCC | 3.3V sensor power |
 | -- | Left | 15 | VIN | DC Converter 5V | Board power input |
 | -- | Left | 14 | GND | Common ground | Ground bus |
@@ -261,11 +278,11 @@ Pins marked with `[*]` are used in this project. Unused pins are `[ ]`.
    Left 5  [ ] | [ D35  ]            [ D21  ] | [*]  Right 5      MPU6050 SDA
    Left 6  [*] | [ D32  ]            [ D19  ] | [*]  Right 6      Motor1 IN1 / Button(L)
    Left 7  [ ] | [ D33  ]            [ D18  ] | [*]  Right 7      Motor1 IN2
-   Left 8  [ ] | [ D25  ]            [ D5   ] | [*]  Right 8      Motor1 IN3
-   Left 9  [ ] | [ D26  ]            [ D17  ] | [*]  Right 9      Motor1 IN4
-   Left 10 [ ] | [ D27  ]            [ D16  ] | [*]  Right 10     Motor2 IN1
+   Left 8  [*] | [ D25  ]            [ D5   ] | [*]  Right 8      RGB Red(L) / Motor1 IN3
+   Left 9  [*] | [ D26  ]            [ D17  ] | [*]  Right 9      RGB Green(L) / Motor1 IN4
+   Left 10 [*] | [ D27  ]            [ D16  ] | [*]  Right 10     RGB Blue(L) / Motor2 IN1
    Left 11 [ ] | [ D14  ]            [ D4   ] | [*]  Right 11     Motor2 IN2
-   Left 12 [ ] | [ D12  ]            [ D2   ] | [*]  Right 12     LED
+   Left 12 [ ] | [ D12  ]            [ D2   ] | [ ]  Right 12     (onboard LED, unused)
    Left 13 [*] | [ D13  ]            [ D15  ] | [*]  Right 13     Motor2 IN3(L) / IN4
    Left 14 [*] | [ GND  ]            [ GND  ] | [*]  Right 14     GND bus x2
    Left 15 [*] | [ VIN  ]            [ 3V3  ] | [*]  Right 15     VIN + 3V3
@@ -307,3 +324,4 @@ Pins marked with `[*]` are used in this project. Unused pins are `[ ]`.
 5. **Keep I2C wires short** (under 30cm) for reliable MPU6050 communication.
 6. **Use the DC converter for motor power** - drawing motor current through the ESP32's USB can cause brownouts and resets.
 7. **Common ground is critical** - every component must share the same GND reference.
+8. **RGB LED wires are all on the left side** - pins 8, 9, 10 (D25, D26, D27). The black wire (GND) shares the ground bus at Left Pin 14.

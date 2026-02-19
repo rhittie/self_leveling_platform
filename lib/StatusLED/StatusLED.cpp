@@ -1,9 +1,28 @@
 #include "StatusLED.h"
 
+// Single-pin constructor (backward compatible)
 StatusLED::StatusLED(uint8_t pin, bool activeLow)
     : _pin(pin)
+    , _pinR(0), _pinG(0), _pinB(0)
     , _activeLow(activeLow)
+    , _rgbMode(false)
     , _pattern(LEDPattern::OFF)
+    , _color(LEDColors::WHITE)
+    , _ledState(false)
+    , _forceOverride(false)
+    , _lastToggleTime(0)
+    , _pulsePhase(0)
+{
+}
+
+// RGB constructor
+StatusLED::StatusLED(uint8_t pinRed, uint8_t pinGreen, uint8_t pinBlue)
+    : _pin(0)
+    , _pinR(pinRed), _pinG(pinGreen), _pinB(pinBlue)
+    , _activeLow(false)
+    , _rgbMode(true)
+    , _pattern(LEDPattern::OFF)
+    , _color(LEDColors::WHITE)
     , _ledState(false)
     , _forceOverride(false)
     , _lastToggleTime(0)
@@ -12,17 +31,29 @@ StatusLED::StatusLED(uint8_t pin, bool activeLow)
 }
 
 void StatusLED::begin() {
-    pinMode(_pin, OUTPUT);
-    setLED(false);
-    Serial.printf("StatusLED: Initialized on pin %d\n", _pin);
+    if (_rgbMode) {
+        // Set up LEDC PWM channels for each color
+        ledcSetup(LEDC_CHANNEL_RED,   LEDC_FREQ, LEDC_RESOLUTION);
+        ledcSetup(LEDC_CHANNEL_GREEN, LEDC_FREQ, LEDC_RESOLUTION);
+        ledcSetup(LEDC_CHANNEL_BLUE,  LEDC_FREQ, LEDC_RESOLUTION);
+
+        ledcAttachPin(_pinR, LEDC_CHANNEL_RED);
+        ledcAttachPin(_pinG, LEDC_CHANNEL_GREEN);
+        ledcAttachPin(_pinB, LEDC_CHANNEL_BLUE);
+
+        writeRGB(0, 0, 0);
+        Serial.printf("StatusLED: RGB mode on pins R=%d G=%d B=%d\n", _pinR, _pinG, _pinB);
+    } else {
+        pinMode(_pin, OUTPUT);
+        setLED(false);
+        Serial.printf("StatusLED: Single-pin mode on pin %d\n", _pin);
+    }
 }
 
 void StatusLED::update() {
     if (_forceOverride) {
-        return;  // Don't update if in force mode
+        return;
     }
-
-    unsigned long currentTime = millis();
 
     switch (_pattern) {
         case LEDPattern::OFF:
@@ -57,9 +88,15 @@ void StatusLED::setPattern(LEDPattern pattern) {
         _lastToggleTime = millis();
         _pulsePhase = 0;
         _forceOverride = false;
-
-        // Immediately update to new pattern
         update();
+    }
+}
+
+void StatusLED::setColor(RGBColor color) {
+    _color = color;
+    // If currently showing, update immediately
+    if (_ledState && !_forceOverride) {
+        writeRGB(_color.r, _color.g, _color.b);
     }
 }
 
@@ -80,16 +117,32 @@ void StatusLED::resumePattern() {
 
 void StatusLED::setLED(bool on) {
     _ledState = on;
-    if (_activeLow) {
-        digitalWrite(_pin, on ? LOW : HIGH);
+
+    if (_rgbMode) {
+        if (on) {
+            writeRGB(_color.r, _color.g, _color.b);
+        } else {
+            writeRGB(0, 0, 0);
+        }
     } else {
-        digitalWrite(_pin, on ? HIGH : LOW);
+        if (_activeLow) {
+            digitalWrite(_pin, on ? LOW : HIGH);
+        } else {
+            digitalWrite(_pin, on ? HIGH : LOW);
+        }
+    }
+}
+
+void StatusLED::writeRGB(uint8_t r, uint8_t g, uint8_t b) {
+    if (_rgbMode) {
+        ledcWrite(LEDC_CHANNEL_RED,   r);
+        ledcWrite(LEDC_CHANNEL_GREEN, g);
+        ledcWrite(LEDC_CHANNEL_BLUE,  b);
     }
 }
 
 void StatusLED::updateBlink(unsigned long period) {
     unsigned long currentTime = millis();
-
     if ((currentTime - _lastToggleTime) >= period) {
         _lastToggleTime = currentTime;
         setLED(!_ledState);
@@ -97,12 +150,6 @@ void StatusLED::updateBlink(unsigned long period) {
 }
 
 void StatusLED::updateDoublePulse() {
-    // Double pulse pattern:
-    // Phase 0: LED on for 100ms
-    // Phase 1: LED off for 100ms
-    // Phase 2: LED on for 100ms
-    // Phase 3: LED off for remaining time (~1700ms)
-
     unsigned long currentTime = millis();
     unsigned long elapsed = currentTime - _lastToggleTime;
 
@@ -136,7 +183,6 @@ void StatusLED::updateDoublePulse() {
 
         case 3:  // Long off period
             setLED(false);
-            // Total period is 2000ms, subtract pulse times
             if (elapsed >= (LED_DOUBLE_PULSE_PERIOD_MS - PULSE_ON_TIME * 2 - PULSE_GAP)) {
                 _lastToggleTime = currentTime;
                 _pulsePhase = 0;

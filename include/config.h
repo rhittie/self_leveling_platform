@@ -24,7 +24,19 @@
 
 // User Interface
 #define PIN_BUTTON 32
-#define PIN_LED 2  // Onboard LED
+#define PIN_LED 2  // Onboard LED (kept as fallback)
+
+// RGB LED (built into push button)
+#define PIN_LED_RED 25
+#define PIN_LED_GREEN 26
+#define PIN_LED_BLUE 27
+
+// ESP32 LEDC PWM channels for RGB
+#define LEDC_CHANNEL_RED 0
+#define LEDC_CHANNEL_GREEN 1
+#define LEDC_CHANNEL_BLUE 2
+#define LEDC_FREQ 5000      // 5 kHz PWM frequency
+#define LEDC_RESOLUTION 8   // 8-bit (0-255) brightness
 
 // ============================================================================
 // Timing Constants

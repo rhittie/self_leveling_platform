@@ -30,7 +30,7 @@ MPU6050Handler imu;
 StepperController motors;
 LevelingController leveling;
 ButtonHandler button(PIN_BUTTON, true);  // Active low with pull-up
-StatusLED statusLED(PIN_LED, false);     // Active high (ESP32 onboard LED)
+StatusLED statusLED(PIN_LED_RED, PIN_LED_GREEN, PIN_LED_BLUE);  // RGB LED in push button
 
 // ============================================================================
 // State Machine
@@ -199,34 +199,40 @@ void changeState(SystemState newState) {
     currentState = newState;
     stateEnteredTime = millis();
 
-    // Set LED pattern for new state
+    // Set LED color + pattern for new state
     switch (newState) {
         case SystemState::IDLE:
+            statusLED.setColor(LEDColors::OFF);
             statusLED.setPattern(LEDPattern::OFF);
             motors.release();
             break;
 
         case SystemState::INITIALIZING:
+            statusLED.setColor(LEDColors::BLUE);
             statusLED.setPattern(LEDPattern::SLOW_BLINK);
             break;
 
         case SystemState::WAIT_FOR_STABLE:
+            statusLED.setColor(LEDColors::YELLOW);
             statusLED.setPattern(LEDPattern::SOLID);
             lastStableTime = millis();
             break;
 
         case SystemState::LEVELING:
+            statusLED.setColor(LEDColors::CYAN);
             statusLED.setPattern(LEDPattern::FAST_BLINK);
             leveling.reset();  // Reset PI integrators
             withinTolerance = false;  // Reset level confirmation
             break;
 
         case SystemState::LEVEL_OK:
+            statusLED.setColor(LEDColors::GREEN);
             statusLED.setPattern(LEDPattern::DOUBLE_PULSE);
             motors.release();  // Save power when level
             break;
 
         case SystemState::ERROR:
+            statusLED.setColor(LEDColors::RED);
             statusLED.setPattern(LEDPattern::ERROR_BLINK);
             motors.release();
             break;
@@ -239,6 +245,7 @@ void changeState(SystemState newState) {
             testModeMotor2Continuous = false;
             testModeLEDCycle = false;
             testModeMotorSpeed = MOTOR_SPEED_RPM;
+            statusLED.setColor(LEDColors::PURPLE);
             statusLED.setPattern(LEDPattern::SOLID);
             printTestModeMenu();
             break;
@@ -594,6 +601,7 @@ void printTestModeMenu() {
     Serial.println("  IMU:     scan, imu, read, stream, cal, raw");
     Serial.println("  Button:  btn (then press button to see events)");
     Serial.println("  LED:     led on/off/slow/fast/pulse/error/cycle");
+    Serial.println("           led red/green/blue/yellow/cyan/purple/white");
     Serial.println("  System:  info, pins");
     Serial.println("  Exit:    exit (return to normal mode)");
     Serial.println("===========================================");
@@ -648,7 +656,7 @@ void printPinInfo() {
     Serial.println();
     Serial.println("  User Interface:");
     Serial.printf("    Button: GPIO %d (Active LOW with pull-up)\n", PIN_BUTTON);
-    Serial.printf("    LED: GPIO %d (Onboard LED)\n", PIN_LED);
+    Serial.printf("    RGB LED: R=GPIO %d, G=GPIO %d, B=GPIO %d\n", PIN_LED_RED, PIN_LED_GREEN, PIN_LED_BLUE);
     Serial.println();
     Serial.println("=== Configuration ===");
     Serial.printf("  Steps per revolution: %d\n", STEPS_PER_REVOLUTION);
@@ -845,8 +853,39 @@ void handleTestModeCommands(String& input) {
             testModeLEDCycleIndex = 0;
             testModeLastLEDCycleTime = millis();
             Serial.println("LED: Cycling through all patterns (2s each)...");
+        // Color commands — set color and turn on solid
+        } else if (ledCmd.equalsIgnoreCase("red")) {
+            statusLED.setColor(LEDColors::RED);
+            statusLED.setPattern(LEDPattern::SOLID);
+            Serial.println("LED: RED");
+        } else if (ledCmd.equalsIgnoreCase("green")) {
+            statusLED.setColor(LEDColors::GREEN);
+            statusLED.setPattern(LEDPattern::SOLID);
+            Serial.println("LED: GREEN");
+        } else if (ledCmd.equalsIgnoreCase("blue")) {
+            statusLED.setColor(LEDColors::BLUE);
+            statusLED.setPattern(LEDPattern::SOLID);
+            Serial.println("LED: BLUE");
+        } else if (ledCmd.equalsIgnoreCase("yellow")) {
+            statusLED.setColor(LEDColors::YELLOW);
+            statusLED.setPattern(LEDPattern::SOLID);
+            Serial.println("LED: YELLOW");
+        } else if (ledCmd.equalsIgnoreCase("cyan")) {
+            statusLED.setColor(LEDColors::CYAN);
+            statusLED.setPattern(LEDPattern::SOLID);
+            Serial.println("LED: CYAN");
+        } else if (ledCmd.equalsIgnoreCase("purple")) {
+            statusLED.setColor(LEDColors::PURPLE);
+            statusLED.setPattern(LEDPattern::SOLID);
+            Serial.println("LED: PURPLE");
+        } else if (ledCmd.equalsIgnoreCase("white")) {
+            statusLED.setColor(LEDColors::WHITE);
+            statusLED.setPattern(LEDPattern::SOLID);
+            Serial.println("LED: WHITE");
         } else {
-            Serial.println("Unknown LED command. Use: on, off, slow, fast, pulse, error, cycle");
+            Serial.println("Unknown LED command.");
+            Serial.println("  Patterns: on, off, slow, fast, pulse, error, cycle");
+            Serial.println("  Colors:   red, green, blue, yellow, cyan, purple, white");
         }
         return;
     }
