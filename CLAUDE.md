@@ -90,12 +90,15 @@ self_leveing_prism/
 9. Motor position reporting in stream/logging + mpos/mreset commands - 2026-02-06
 10. PI controller error sign fix + gain tuning for hardware - 2026-02-06
 11. Complementary filter alpha 0.02→0.15 for faster convergence - 2026-02-06
+12. Motor 2 coil wiring fix (pin order 16,13,15,4) - 2026-02-19
+13. Motor limits GUI rewrite: direct serial, both-motors control, M2 direction fix - 2026-02-19
 
 ## Next Steps
 
-1. [ ] Add serial command to start leveling (currently requires button press)
-2. [ ] Full closed-loop leveling test with button press
-3. [ ] Set up Notion sync (optional - requires API key)
+1. [ ] Find and set motor limits using GUI (IN/OUT positions for both motors)
+2. [ ] Update config.h with final MOTOR_MIN/MAX_POSITION values
+3. [ ] Full closed-loop leveling test with button press
+4. [ ] Set up Notion sync (optional - requires API key)
 
 ## Decisions Made
 
@@ -115,6 +118,9 @@ self_leveing_prism/
 | PI error sign = +actual (not -actual) | Plant has negative gain (positive steps decrease angles); error=actual gives net negative feedback | 2026-02-06 |
 | PI gains: Kp_pitch=1.0, Kp_roll=0.5 | Pitch ~2x less effective per step than roll; stepsPerDegree=60 | 2026-02-06 |
 | INVERT_PITCH/ROLL both false | Hardware test confirmed IMU reads correct signs; fix was in PI error sign | 2026-02-06 |
+| Motor 2 pin order: 16,13,15,4 | Original order (16,4,15,13) caused humming; coils needed reordering | 2026-02-19 |
+| Direct serial writes in GUI | Worker thread queue caused intermittent Motor 2 failures; direct writes work reliably | 2026-02-19 |
+| Motor 2 GUI direction reversed | Lead screw orientation means positive firmware steps = retract; GUI flips for intuitive +/- | 2026-02-19 |
 
 ## Known Issues & Bugs
 
@@ -123,27 +129,30 @@ self_leveing_prism/
 
 ## Session Handoff Notes
 
-**Last Session:** 2026-02-06
+**Last Session:** 2026-02-19
 
 **What We Were Working On:**
-Motor safety limits, IMU orientation fix, and Dashboard GUI
+Motor 2 wiring fix and motor limits GUI improvements
 
 **Where We Left Off:**
-Fixed PI controller and tuned gains. Full hardware testing done.
+Both motors working correctly through the GUI. Ready to find physical motor limits.
 
-1. **PI error sign fix** — Original code had `error = -actual` which caused positive feedback. Fixed to `error = actual` to account for negative plant gain (positive motor steps decrease angles).
-2. **PI gains tuned** — Kp_pitch=1.0, Ki_pitch=0.05, Kp_roll=0.5, Ki_roll=0.03, stepsPerDegree=60
-3. **INVERT flags** — Both false. IMU reads correct signs; the bug was in the controller.
-4. **Verified** — 20-cycle correction test with M1+2000 initial tilt showed roll correctly converging (0.787 to 0.460 over cycles). Motor positions moving in expected directions.
-5. **Motor mapping** — M1: dP=-0.22, dR=+0.42 | M2: dP=-0.20, dR=-0.45 per 1000 steps
+1. **Motor 2 coil fix** — Original pin order (16,4,15,13) caused humming. Correct order is (16,13,15,4) — confirmed via coiltest command and serial monitor testing.
+2. **GUI serial rewrite** — Worker thread queue caused intermittent Motor 2 failures. Replaced with direct serial writes + threading lock. All motor commands now reliable.
+3. **Motor 2 direction** — Lead screw is physically reversed vs Motor 1. GUI flips direction so +/- is intuitive (+ = extend out, - = retract in for both motors).
+4. **Both-motors control** — Added to GUI for simultaneous movement when finding limits.
+5. **Screw was blocking** — User found a screw blocking Motor 2's lead screw rotation; removed it.
 
 **What Needs to Happen Next:**
-- Full closed-loop test (requires button press to enter LEVELING state)
-- Consider adding serial command to start leveling for easier testing
-- Fine-tune gains based on closed-loop behavior
+- Use motor limits GUI to find IN (min) and OUT (max) positions for both motors
+- Update MOTOR_MIN_POSITION and MOTOR_MAX_POSITION in config.h with actual values
+- Full closed-loop leveling test
+- Note: Motor 2 direction reversal is only in the GUI — firmware and leveling controller may need a direction flag too
 
 **Important Context:**
-This is a PlatformIO ESP32 project. Build with `pio run`, upload with `pio run -t upload`.
+- PlatformIO ESP32 project. Build with `pio run`, upload with `pio run -t upload`.
+- Motor limits GUI: `python tools/motor_limits_gui.py`
+- Current config.h limits: MIN=0, MAX=70000 (placeholder, needs real values from testing)
 
 ---
 
