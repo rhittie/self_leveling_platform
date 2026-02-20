@@ -119,4 +119,13 @@
 
 #define SERIAL_BAUD_RATE 115200
 
+// ============================================================================
+// WiFi / Web Dashboard
+// ============================================================================
+
+#define WIFI_AP_SSID "LevelingPrism"
+#define WIFI_AP_PASSWORD "level1234"
+#define WEB_STATUS_INTERVAL_MS 100   // 10 Hz broadcast rate
+#define WS_MAX_CLIENTS 4             // Max simultaneous WebSocket clients
+
 #endif // CONFIG_H

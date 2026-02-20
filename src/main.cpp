@@ -22,6 +22,7 @@
 #include "LevelingController.h"
 #include "ButtonHandler.h"
 #include "StatusLED.h"
+#include "WebDashboard.h"
 
 // ============================================================================
 // Global Objects
@@ -33,6 +34,7 @@ LevelingController leveling;
 ButtonHandler button(PIN_BUTTON, true);  // Active low with pull-up
 StatusLED statusLED(PIN_LED_RED, PIN_LED_GREEN, PIN_LED_BLUE);  // RGB LED in push button
 Preferences prefs;
+WebDashboard dashboard;
 
 // ============================================================================
 // State Machine
@@ -139,6 +141,37 @@ void setup() {
     // Start in IDLE state
     changeState(SystemState::IDLE);
 
+    // Initialize web dashboard
+    dashboard.begin();
+    dashboard.onMotorMove([](int motor, int steps) {
+        if (motor == 1) motors.moveMotor1(steps);
+        else if (motor == 2) motors.moveMotor2(steps);
+    });
+    dashboard.onCalibrate([]() {
+        if (currentState == SystemState::IDLE) {
+            if (imu.begin()) imu.calibrate();
+        }
+    });
+    dashboard.onResetPositions([]() {
+        motors.resetPositions();
+    });
+    dashboard.onStateChange([](const char* state) {
+        if (strcmp(state, "IDLE") == 0) changeState(SystemState::IDLE);
+        else if (strcmp(state, "INITIALIZING") == 0) changeState(SystemState::INITIALIZING);
+    });
+    dashboard.onSetGains([](float kpP, float kiP, float kpR, float kiR) {
+        config.kpPitch = kpP; config.kiPitch = kiP;
+        config.kpRoll = kpR; config.kiRoll = kiR;
+        leveling.setPitchGains(kpP, kiP);
+        leveling.setRollGains(kpR, kiR);
+    });
+    dashboard.onSetTolerance([](float tol) {
+        if (tol > 0 && tol < 10) config.levelTolerance = tol;
+    });
+    dashboard.onRelease([]() {
+        motors.release();
+    });
+
     Serial.println("System ready. Press button to start leveling.");
     Serial.println("Type 'h' for serial command help.");
     Serial.println();
@@ -221,6 +254,31 @@ void loop() {
                           imu.getPitch(), imu.getRoll(), imu.isMoving() ? 1 : 0,
                           motors.getPosition1(), motors.getPosition2());
         }
+    }
+
+    // Web dashboard: broadcast status at 10 Hz
+    static unsigned long lastWsBroadcast = 0;
+    if (currentTime - lastWsBroadcast >= WEB_STATUS_INTERVAL_MS) {
+        lastWsBroadcast = currentTime;
+        if (dashboard.getClientCount() > 0) {
+            dashboard.broadcastStatus(
+                imu.getPitch(), imu.getRoll(),
+                motors.getPosition1(), motors.getPosition2(),
+                motors.getMinPosition(), motors.getMaxPosition(),
+                motors.isAtLimit1(), motors.isAtLimit2(),
+                stateToString(currentState),
+                imu.getCalibration().isCalibrated,
+                imu.isLevel(config.levelTolerance),
+                config.levelTolerance
+            );
+        }
+    }
+
+    // WebSocket client cleanup every 2 seconds
+    static unsigned long lastWsCleanup = 0;
+    if (currentTime - lastWsCleanup >= 2000) {
+        lastWsCleanup = currentTime;
+        dashboard.cleanupClients();
     }
 }
 

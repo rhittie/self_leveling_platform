@@ -1,0 +1,205 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    min-height: 100vh;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: #16213e;
+    border-bottom: 1px solid #0f3460;
+}
+
+header h1 { font-size: 18px; font-weight: 600; }
+
+.header-right { display: flex; align-items: center; gap: 10px; }
+
+.dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    display: inline-block;
+}
+.dot.red { background: #e74c3c; }
+.dot.green { background: #2ecc71; }
+
+.badge {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+main { padding: 12px; max-width: 600px; margin: 0 auto; }
+
+.card {
+    background: #16213e;
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 12px;
+}
+
+.card h2 {
+    font-size: 14px;
+    color: #8899aa;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* Angles */
+.angles-card { text-align: center; }
+
+.angle-readouts {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    margin-bottom: 12px;
+}
+
+.angle-box { display: flex; flex-direction: column; align-items: center; }
+.angle-box .label { font-size: 12px; color: #8899aa; }
+.angle-box .value { font-size: 28px; font-weight: 700; font-family: 'Consolas', monospace; }
+.angle-box .unit { font-size: 16px; color: #8899aa; }
+
+canvas {
+    border-radius: 50%;
+    border: 2px solid #0f3460;
+    display: block;
+    margin: 0 auto;
+}
+
+/* Motor bars */
+.motor-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.motor-label {
+    width: 30px;
+    font-weight: 600;
+    font-family: 'Consolas', monospace;
+}
+
+.bar-bg {
+    flex: 1;
+    height: 20px;
+    background: #0a0a1a;
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+}
+
+.bar-fill {
+    height: 100%;
+    background: #3498db;
+    border-radius: 4px;
+    transition: width 0.15s, background 0.15s;
+    min-width: 2px;
+}
+
+.bar-fill.at-limit { background: #e74c3c; }
+
+.motor-val {
+    width: 60px;
+    text-align: right;
+    font-family: 'Consolas', monospace;
+    font-size: 13px;
+}
+
+/* Motor controls */
+.motor-ctrl {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.ctrl-label {
+    width: 30px;
+    font-weight: 600;
+    font-family: 'Consolas', monospace;
+}
+
+.motor-ctrl button {
+    flex: 1;
+    padding: 10px 2px;
+    border: none;
+    border-radius: 6px;
+    background: #0f3460;
+    color: #e0e0e0;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.motor-ctrl button:active { background: #1a5276; }
+
+/* Action buttons */
+.action-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.action-btn {
+    padding: 14px 8px;
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.action-btn:active { opacity: 0.7; }
+
+.action-btn.green { background: #27ae60; }
+.action-btn.blue { background: #2980b9; }
+.action-btn.yellow { background: #d4a017; }
+.action-btn.gray { background: #555; }
+.action-btn.red { background: #c0392b; }
+
+/* PI Tuning */
+.tune-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px 12px;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.tune-grid label {
+    font-size: 13px;
+    color: #8899aa;
+}
+
+.tune-grid input {
+    padding: 8px;
+    border: 1px solid #0f3460;
+    border-radius: 6px;
+    background: #0a0a1a;
+    color: #e0e0e0;
+    font-size: 14px;
+    font-family: 'Consolas', monospace;
+    width: 100%;
+}
+
+/* State badge colors */
+.badge-idle { background: #555; color: #ccc; }
+.badge-initializing { background: #2980b9; }
+.badge-wait_for_stable { background: #d4a017; }
+.badge-leveling { background: #17a2b8; }
+.badge-level_ok { background: #27ae60; }
+.badge-error { background: #e74c3c; }
+.badge-test_mode { background: #8e44ad; }
+.badge-safe_shutdown { background: #27ae60; }
