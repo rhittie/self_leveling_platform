@@ -11,190 +11,149 @@ header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px 16px;
+    padding: 10px 16px;
     background: #16213e;
     border-bottom: 1px solid #0f3460;
 }
 
-header h1 { font-size: 18px; font-weight: 600; }
-
+header h1 { font-size: 16px; font-weight: 600; }
 .header-right { display: flex; align-items: center; gap: 10px; }
 
-.dot {
-    width: 10px; height: 10px; border-radius: 50%;
-    display: inline-block;
-}
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 .dot.red { background: #e74c3c; }
 .dot.green { background: #2ecc71; }
 
 .badge {
-    padding: 4px 12px;
+    padding: 3px 10px;
     border-radius: 12px;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;
 }
 
-main { padding: 12px; max-width: 600px; margin: 0 auto; }
+/* Tabs */
+.tabs {
+    display: flex;
+    background: #16213e;
+    border-bottom: 2px solid #0f3460;
+    overflow-x: auto;
+}
+.tab {
+    flex: 1;
+    padding: 10px 8px;
+    border: none;
+    background: transparent;
+    color: #8899aa;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+}
+.tab.active { color: #3498db; border-bottom-color: #3498db; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+main { padding: 10px; max-width: 600px; margin: 0 auto; }
 
 .card {
     background: #16213e;
     border-radius: 10px;
-    padding: 16px;
-    margin-bottom: 12px;
+    padding: 14px;
+    margin-bottom: 10px;
 }
-
 .card h2 {
-    font-size: 14px;
+    font-size: 12px;
     color: #8899aa;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
     text-transform: uppercase;
     letter-spacing: 1px;
 }
 
 /* Angles */
 .angles-card { text-align: center; }
-
-.angle-readouts {
-    display: flex;
-    justify-content: center;
-    gap: 40px;
-    margin-bottom: 12px;
-}
-
+.angle-readouts { display: flex; justify-content: center; gap: 40px; margin-bottom: 10px; }
 .angle-box { display: flex; flex-direction: column; align-items: center; }
-.angle-box .label { font-size: 12px; color: #8899aa; }
-.angle-box .value { font-size: 28px; font-weight: 700; font-family: 'Consolas', monospace; }
-.angle-box .unit { font-size: 16px; color: #8899aa; }
+.angle-box .label { font-size: 11px; color: #8899aa; }
+.angle-box .value { font-size: 26px; font-weight: 700; font-family: 'Consolas', monospace; }
+.angle-box .unit { font-size: 14px; color: #8899aa; }
 
-canvas {
-    border-radius: 50%;
-    border: 2px solid #0f3460;
-    display: block;
-    margin: 0 auto;
-}
+canvas { border-radius: 50%; border: 2px solid #0f3460; display: block; margin: 0 auto; }
 
 /* Motor bars */
-.motor-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 8px;
-}
-
-.motor-label {
-    width: 30px;
-    font-weight: 600;
-    font-family: 'Consolas', monospace;
-}
-
-.bar-bg {
-    flex: 1;
-    height: 20px;
-    background: #0a0a1a;
-    border-radius: 4px;
-    overflow: hidden;
-    position: relative;
-}
-
-.bar-fill {
-    height: 100%;
-    background: #3498db;
-    border-radius: 4px;
-    transition: width 0.15s, background 0.15s;
-    min-width: 2px;
-}
-
+.motor-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.motor-label { width: 28px; font-weight: 600; font-family: 'Consolas', monospace; font-size: 13px; }
+.bar-bg { flex: 1; height: 18px; background: #0a0a1a; border-radius: 4px; overflow: hidden; }
+.bar-fill { height: 100%; background: #3498db; border-radius: 4px; transition: width 0.15s; min-width: 2px; }
 .bar-fill.at-limit { background: #e74c3c; }
+.motor-val { width: 55px; text-align: right; font-family: 'Consolas', monospace; font-size: 12px; }
 
-.motor-val {
-    width: 60px;
-    text-align: right;
-    font-family: 'Consolas', monospace;
-    font-size: 13px;
-}
+/* Data grid */
+.data-grid { display: grid; grid-template-columns: 60px 1fr; gap: 4px 10px; }
+.dlbl { font-size: 12px; color: #8899aa; }
+.dval { font-size: 12px; font-family: 'Consolas', monospace; }
 
 /* Motor controls */
-.motor-ctrl {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    margin-bottom: 8px;
-}
-
-.ctrl-label {
-    width: 30px;
-    font-weight: 600;
-    font-family: 'Consolas', monospace;
-}
-
+.motor-ctrl { display: flex; align-items: center; gap: 3px; margin-bottom: 6px; }
+.ctrl-label { width: 32px; font-weight: 600; font-family: 'Consolas', monospace; font-size: 12px; }
 .motor-ctrl button {
-    flex: 1;
-    padding: 10px 2px;
-    border: none;
-    border-radius: 6px;
-    background: #0f3460;
-    color: #e0e0e0;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    touch-action: manipulation;
+    flex: 1; padding: 10px 2px; border: none; border-radius: 6px;
+    background: #0f3460; color: #e0e0e0; font-size: 11px; font-weight: 600;
+    cursor: pointer; touch-action: manipulation;
 }
-
 .motor-ctrl button:active { background: #1a5276; }
 
-/* Action buttons */
-.action-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-}
+/* Button rows */
+.btn-row { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
 
 .action-btn {
-    padding: 14px 8px;
-    border: none;
-    border-radius: 8px;
-    color: white;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    touch-action: manipulation;
+    flex: 1; padding: 12px 6px; border: none; border-radius: 8px;
+    color: white; font-size: 13px; font-weight: 600; cursor: pointer;
+    touch-action: manipulation; min-width: 80px;
 }
-
 .action-btn:active { opacity: 0.7; }
-
 .action-btn.green { background: #27ae60; }
 .action-btn.blue { background: #2980b9; }
 .action-btn.yellow { background: #d4a017; }
 .action-btn.gray { background: #555; }
 .action-btn.red { background: #c0392b; }
+.action-btn.purple { background: #8e44ad; }
 
-/* PI Tuning */
+.sm-btn {
+    padding: 8px 12px; border: none; border-radius: 6px;
+    background: #0f3460; color: #e0e0e0; font-size: 12px; font-weight: 600;
+    cursor: pointer; touch-action: manipulation;
+}
+.sm-btn:active { background: #1a5276; }
+
+.color-btn {
+    width: 36px; height: 36px; border: 2px solid #333; border-radius: 50%;
+    color: white; font-size: 14px; font-weight: 700; cursor: pointer;
+    touch-action: manipulation;
+}
+.color-btn:active { opacity: 0.7; }
+
+.inline-ctrl { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.inline-ctrl label { font-size: 12px; color: #8899aa; }
+.inline-ctrl input {
+    padding: 6px; border: 1px solid #0f3460; border-radius: 6px;
+    background: #0a0a1a; color: #e0e0e0; font-size: 13px; font-family: 'Consolas', monospace;
+}
+
+/* PI Tuning grid */
 .tune-grid {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 8px 12px;
-    align-items: center;
-    margin-bottom: 12px;
+    display: grid; grid-template-columns: auto 1fr; gap: 6px 10px;
+    align-items: center; margin-bottom: 10px;
 }
-
-.tune-grid label {
-    font-size: 13px;
-    color: #8899aa;
-}
-
+.tune-grid label { font-size: 12px; color: #8899aa; }
 .tune-grid input {
-    padding: 8px;
-    border: 1px solid #0f3460;
-    border-radius: 6px;
-    background: #0a0a1a;
-    color: #e0e0e0;
-    font-size: 14px;
-    font-family: 'Consolas', monospace;
-    width: 100%;
+    padding: 7px; border: 1px solid #0f3460; border-radius: 6px;
+    background: #0a0a1a; color: #e0e0e0; font-size: 13px;
+    font-family: 'Consolas', monospace; width: 100%;
 }
 
-/* State badge colors */
+/* State badges */
 .badge-idle { background: #555; color: #ccc; }
 .badge-initializing { background: #2980b9; }
 .badge-wait_for_stable { background: #d4a017; }
@@ -203,3 +162,66 @@ canvas {
 .badge-error { background: #e74c3c; }
 .badge-test_mode { background: #8e44ad; }
 .badge-safe_shutdown { background: #27ae60; }
+
+/* Motor Limits tab */
+.step-selector { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.step-btn {
+    padding: 10px 14px; border: 2px solid #0f3460; border-radius: 6px;
+    background: transparent; color: #8899aa; font-size: 13px; font-weight: 600;
+    cursor: pointer;
+}
+.step-btn.active { border-color: #3498db; color: #3498db; background: rgba(52,152,219,0.1); }
+.step-selector input {
+    padding: 8px; border: 1px solid #0f3460; border-radius: 6px;
+    background: #0a0a1a; color: #e0e0e0; font-size: 13px; font-family: 'Consolas', monospace;
+}
+
+.limit-both { display: flex; gap: 10px; }
+.big-btn {
+    flex: 1; padding: 20px; border: none; border-radius: 10px;
+    color: white; font-size: 24px; font-weight: 700; cursor: pointer;
+    touch-action: manipulation;
+}
+.big-btn.red { background: #c0392b; }
+.big-btn.green { background: #27ae60; }
+.big-btn:active { opacity: 0.7; }
+
+.limit-pos {
+    font-size: 32px; font-weight: 700; font-family: 'Consolas', monospace;
+    text-align: center; padding: 10px 0; color: #3498db;
+}
+
+.limit-ctrl { display: flex; gap: 8px; align-items: center; }
+.limit-ctrl .action-btn { flex: 0.5; }
+
+.limit-set-row {
+    display: grid; grid-template-columns: 1fr auto 1fr auto;
+    gap: 6px; align-items: center; margin-top: 10px;
+}
+.limit-val {
+    font-family: 'Consolas', monospace; font-size: 14px; font-weight: 600;
+    color: #3498db; min-width: 50px; text-align: center;
+}
+
+#configOutput {
+    background: #0a0a1a; padding: 10px; border-radius: 6px;
+    font-family: 'Consolas', monospace; font-size: 12px;
+    color: #2ecc71; margin-bottom: 10px; white-space: pre-wrap;
+    max-height: 150px; overflow-y: auto;
+}
+
+/* Terminal */
+.terminal-card { display: flex; flex-direction: column; height: calc(100vh - 150px); min-height: 300px; }
+.term-output {
+    flex: 1; background: #0a0a1a; border-radius: 6px; padding: 8px;
+    font-family: 'Consolas', monospace; font-size: 12px; color: #2ecc71;
+    overflow-y: auto; white-space: pre-wrap; word-break: break-all;
+    margin-bottom: 8px;
+}
+.term-input-row { display: flex; gap: 6px; }
+.term-input-row input {
+    flex: 1; padding: 10px; border: 1px solid #0f3460; border-radius: 6px;
+    background: #0a0a1a; color: #e0e0e0; font-size: 14px;
+    font-family: 'Consolas', monospace;
+}
+.term-input-row .action-btn { flex: 0; min-width: 60px; }

@@ -131,6 +131,7 @@ void setup() {
     config.kiRoll = DEFAULT_KI_ROLL;
     config.levelTolerance = LEVEL_TOLERANCE_DEG;
     config.continuousLogging = false;
+    config.stabilityTimeoutMs = STABILITY_TIMEOUT_MS;
 
     // Initialize components
     button.begin();
@@ -147,17 +148,30 @@ void setup() {
         if (motor == 1) motors.moveMotor1(steps);
         else if (motor == 2) motors.moveMotor2(steps);
     });
+    dashboard.onBothMotors([](int s1, int s2) {
+        motors.moveBoth(s1, s2);
+    });
     dashboard.onCalibrate([]() {
-        if (currentState == SystemState::IDLE) {
-            if (imu.begin()) imu.calibrate();
-        }
+        if (imu.begin()) imu.calibrate();
     });
     dashboard.onResetPositions([]() {
         motors.resetPositions();
     });
+    dashboard.onResetPosition1([]() {
+        motors.resetPosition1();
+    });
+    dashboard.onResetPosition2([]() {
+        motors.resetPosition2();
+    });
+    dashboard.onSetPositions([](long val) {
+        motors.setPosition1(val);
+        motors.setPosition2(val);
+        saveMotorPositions();
+    });
     dashboard.onStateChange([](const char* state) {
         if (strcmp(state, "IDLE") == 0) changeState(SystemState::IDLE);
         else if (strcmp(state, "INITIALIZING") == 0) changeState(SystemState::INITIALIZING);
+        else if (strcmp(state, "TEST_MODE") == 0) changeState(SystemState::TEST_MODE);
     });
     dashboard.onSetGains([](float kpP, float kiP, float kpR, float kiR) {
         config.kpPitch = kpP; config.kiPitch = kiP;
@@ -168,8 +182,41 @@ void setup() {
     dashboard.onSetTolerance([](float tol) {
         if (tol > 0 && tol < 10) config.levelTolerance = tol;
     });
+    dashboard.onSetStabilityTimeout([](float sec) {
+        if (sec >= 0.5f && sec <= 30.0f) {
+            config.stabilityTimeoutMs = (unsigned long)(sec * 1000);
+        }
+    });
     dashboard.onRelease([]() {
         motors.release();
+    });
+    dashboard.onMotorStop([]() {
+        // Stop continuous rotation flags and release
+        motors.release();
+    });
+    dashboard.onMotorSpeed([](int rpm) {
+        if (rpm >= 1 && rpm <= 15) motors.setSpeed(rpm);
+    });
+    dashboard.onLed([](const char* mode) {
+        if (strcmp(mode, "on") == 0) { statusLED.setPattern(LEDPattern::SOLID); }
+        else if (strcmp(mode, "off") == 0) { statusLED.setPattern(LEDPattern::OFF); }
+        else if (strcmp(mode, "slow") == 0) { statusLED.setPattern(LEDPattern::SLOW_BLINK); }
+        else if (strcmp(mode, "fast") == 0) { statusLED.setPattern(LEDPattern::FAST_BLINK); }
+        else if (strcmp(mode, "pulse") == 0) { statusLED.setPattern(LEDPattern::DOUBLE_PULSE); }
+        else if (strcmp(mode, "error") == 0) { statusLED.setPattern(LEDPattern::ERROR_BLINK); }
+        else if (strcmp(mode, "red") == 0) { statusLED.setColor(LEDColors::RED); statusLED.setPattern(LEDPattern::SOLID); }
+        else if (strcmp(mode, "green") == 0) { statusLED.setColor(LEDColors::GREEN); statusLED.setPattern(LEDPattern::SOLID); }
+        else if (strcmp(mode, "blue") == 0) { statusLED.setColor(LEDColors::BLUE); statusLED.setPattern(LEDPattern::SOLID); }
+        else if (strcmp(mode, "yellow") == 0) { statusLED.setColor(LEDColors::YELLOW); statusLED.setPattern(LEDPattern::SOLID); }
+        else if (strcmp(mode, "cyan") == 0) { statusLED.setColor(LEDColors::CYAN); statusLED.setPattern(LEDPattern::SOLID); }
+        else if (strcmp(mode, "purple") == 0) { statusLED.setColor(LEDColors::PURPLE); statusLED.setPattern(LEDPattern::SOLID); }
+        else if (strcmp(mode, "white") == 0) { statusLED.setColor(LEDColors::WHITE); statusLED.setPattern(LEDPattern::SOLID); }
+    });
+    dashboard.onUnlockLimits([]() {
+        motors.setLimits(-99999, 99999);
+    });
+    dashboard.onLockLimits([]() {
+        motors.setLimits(MOTOR_MIN_POSITION, MOTOR_MAX_POSITION);
     });
 
     Serial.println("System ready. Press button to start leveling.");
@@ -261,15 +308,22 @@ void loop() {
     if (currentTime - lastWsBroadcast >= WEB_STATUS_INTERVAL_MS) {
         lastWsBroadcast = currentTime;
         if (dashboard.getClientCount() > 0) {
+            const IMUData& d = imu.getData();
             dashboard.broadcastStatus(
                 imu.getPitch(), imu.getRoll(),
+                d.accelX, d.accelY, d.accelZ,
+                d.gyroX, d.gyroY, d.gyroZ,
+                d.temperature,
                 motors.getPosition1(), motors.getPosition2(),
                 motors.getMinPosition(), motors.getMaxPosition(),
                 motors.isAtLimit1(), motors.isAtLimit2(),
                 stateToString(currentState),
                 imu.getCalibration().isCalibrated,
                 imu.isLevel(config.levelTolerance),
-                config.levelTolerance
+                config.levelTolerance,
+                config.stabilityTimeoutMs,
+                config.kpPitch, config.kiPitch, config.kpRoll, config.kiRoll,
+                millis()
             );
         }
     }
@@ -400,7 +454,7 @@ void handleWaitForStableState() {
     }
 
     // Check if stable long enough
-    if (currentTime - lastStableTime >= STABILITY_TIMEOUT_MS) {
+    if (currentTime - lastStableTime >= config.stabilityTimeoutMs) {
         Serial.println("Platform stable. Starting leveling...");
         changeState(SystemState::LEVELING);
     }
@@ -506,6 +560,26 @@ void handleSerialCommands() {
     // If in test mode, use the test mode command handler
     if (currentState == SystemState::TEST_MODE) {
         handleTestModeCommands(input);
+        return;
+    }
+
+    // Multi-char commands that would conflict with single-char switch
+    if (input.startsWith("st") || input.startsWith("ST") || input.startsWith("St")) {
+        // Set stability timeout: st <seconds>
+        if (input.length() < 4) {
+            Serial.printf("Stability timeout: %lu ms (%.1f sec)\n",
+                          config.stabilityTimeoutMs, config.stabilityTimeoutMs / 1000.0f);
+            Serial.println("Usage: st <seconds>  (0.5 - 30)");
+        } else {
+            float seconds = input.substring(3).toFloat();
+            if (seconds >= 0.5f && seconds <= 30.0f) {
+                config.stabilityTimeoutMs = (unsigned long)(seconds * 1000);
+                Serial.printf("Stability timeout set to %lu ms (%.1f sec)\n",
+                              config.stabilityTimeoutMs, seconds);
+            } else {
+                Serial.println("Invalid timeout (must be between 0.5 and 30 seconds)");
+            }
+        }
         return;
     }
 
@@ -646,6 +720,7 @@ void printHelp() {
     Serial.println("  r         - Reset to IDLE state");
     Serial.println("  p <kp> <ki> - Set PI gains");
     Serial.println("  t <deg>   - Set level tolerance");
+    Serial.println("  st <sec>  - Set stability timeout (default 3s)");
     Serial.println("  l         - Toggle continuous logging");
     Serial.println("  level     - Start leveling (same as button press)");
     Serial.println();
@@ -767,7 +842,7 @@ void printPinInfo() {
     Serial.printf("  Steps per revolution: %d\n", STEPS_PER_REVOLUTION);
     Serial.printf("  Default motor speed: %d RPM\n", MOTOR_SPEED_RPM);
     Serial.printf("  Level tolerance: %.2f deg\n", LEVEL_TOLERANCE_DEG);
-    Serial.printf("  Stability timeout: %d ms\n", STABILITY_TIMEOUT_MS);
+    Serial.printf("  Stability timeout: %lu ms (%.1f sec)\n", config.stabilityTimeoutMs, config.stabilityTimeoutMs / 1000.0f);
     Serial.println();
 }
 

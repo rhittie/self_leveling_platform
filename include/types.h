@@ -117,6 +117,7 @@ struct SystemConfig {
     float kiRoll;
     float levelTolerance;
     bool continuousLogging;
+    unsigned long stabilityTimeoutMs;  // How long platform must be still before leveling (ms)
 };
 
 #endif // TYPES_H

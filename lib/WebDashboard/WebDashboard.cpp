@@ -33,16 +33,30 @@ bool WebDashboard::begin() {
 
 void WebDashboard::broadcastStatus(
     float pitch, float roll,
+    float accelX, float accelY, float accelZ,
+    float gyroX, float gyroY, float gyroZ,
+    float temperature,
     long m1pos, long m2pos,
     long minPos, long maxPos,
     bool m1limit, bool m2limit,
     const char* state,
     bool isCalibrated, bool isLevel,
-    float tolerance
+    float tolerance,
+    unsigned long stabilityTimeoutMs,
+    float kpPitch, float kiPitch, float kpRoll, float kiRoll,
+    unsigned long uptime
 ) {
     JsonDocument doc;
+    doc["t"] = "status";
     doc["pitch"] = serialized(String(pitch, 2));
     doc["roll"] = serialized(String(roll, 2));
+    doc["ax"] = serialized(String(accelX, 3));
+    doc["ay"] = serialized(String(accelY, 3));
+    doc["az"] = serialized(String(accelZ, 3));
+    doc["gx"] = serialized(String(gyroX, 1));
+    doc["gy"] = serialized(String(gyroY, 1));
+    doc["gz"] = serialized(String(gyroZ, 1));
+    doc["temp"] = serialized(String(temperature, 1));
     doc["m1"] = m1pos;
     doc["m2"] = m2pos;
     doc["mMin"] = minPos;
@@ -53,7 +67,22 @@ void WebDashboard::broadcastStatus(
     doc["cal"] = isCalibrated;
     doc["level"] = isLevel;
     doc["tol"] = serialized(String(tolerance, 2));
+    doc["stMs"] = stabilityTimeoutMs;
+    doc["kpP"] = serialized(String(kpPitch, 2));
+    doc["kiP"] = serialized(String(kiPitch, 3));
+    doc["kpR"] = serialized(String(kpRoll, 2));
+    doc["kiR"] = serialized(String(kiRoll, 3));
+    doc["up"] = uptime;
 
+    char buf[512];
+    size_t len = serializeJson(doc, buf, sizeof(buf));
+    _ws.textAll(buf, len);
+}
+
+void WebDashboard::sendLog(const char* msg) {
+    JsonDocument doc;
+    doc["t"] = "log";
+    doc["msg"] = msg;
     char buf[256];
     size_t len = serializeJson(doc, buf, sizeof(buf));
     _ws.textAll(buf, len);
@@ -101,44 +130,106 @@ void WebDashboard::handleMessage(AsyncWebSocketClient* client, uint8_t* data, si
     const char* cmd = doc["cmd"];
     if (!cmd) return;
 
+    // Motor move: {"cmd":"motor","id":1,"steps":100}
     if (strcmp(cmd, "motor") == 0 && _motorMoveCb) {
         int id = doc["id"] | 0;
         int steps = doc["steps"] | 0;
         if (id == 1 || id == 2) {
             _motorMoveCb(id, steps);
-            Serial.printf("[WEB] Motor %d move %d steps\n", id, steps);
         }
     }
+    // Both motors: {"cmd":"both","m1":100,"m2":-100}
+    else if (strcmp(cmd, "both") == 0 && _bothMotorsCb) {
+        int s1 = doc["m1"] | 0;
+        int s2 = doc["m2"] | 0;
+        _bothMotorsCb(s1, s2);
+    }
+    // Motor stop: {"cmd":"mstop"}
+    else if (strcmp(cmd, "mstop") == 0 && _motorStopCb) {
+        _motorStopCb();
+    }
+    // Motor speed: {"cmd":"mspeed","value":10}
+    else if (strcmp(cmd, "mspeed") == 0 && _motorSpeedCb) {
+        int rpm = doc["value"] | 10;
+        _motorSpeedCb(rpm);
+    }
+    // Motor continuous: {"cmd":"mcont","id":1}
+    else if (strcmp(cmd, "mcont") == 0 && _motorContCb) {
+        int id = doc["id"] | 0;
+        _motorContCb(id);
+    }
+    // Reset both positions: {"cmd":"mreset"}
     else if (strcmp(cmd, "mreset") == 0 && _resetPosCb) {
         _resetPosCb();
-        Serial.println("[WEB] Motor positions reset");
     }
+    // Reset motor 1: {"cmd":"mreset1"}
+    else if (strcmp(cmd, "mreset1") == 0 && _resetPos1Cb) {
+        _resetPos1Cb();
+    }
+    // Reset motor 2: {"cmd":"mreset2"}
+    else if (strcmp(cmd, "mreset2") == 0 && _resetPos2Cb) {
+        _resetPos2Cb();
+    }
+    // Set both positions: {"cmd":"mset","value":0}
+    else if (strcmp(cmd, "mset") == 0 && _setPosCb) {
+        long val = doc["value"] | 0L;
+        _setPosCb(val);
+    }
+    // Unlock motor limits: {"cmd":"munlock"}
+    else if (strcmp(cmd, "munlock") == 0 && _unlockCb) {
+        _unlockCb();
+    }
+    // Lock motor limits: {"cmd":"mlock"}
+    else if (strcmp(cmd, "mlock") == 0 && _lockCb) {
+        _lockCb();
+    }
+    // Calibrate IMU: {"cmd":"calibrate"}
     else if (strcmp(cmd, "calibrate") == 0 && _calibrateCb) {
         _calibrateCb();
-        Serial.println("[WEB] IMU calibration triggered");
     }
+    // I2C scan: {"cmd":"scan"}
+    else if (strcmp(cmd, "scan") == 0 && _scanCb) {
+        _scanCb();
+    }
+    // Stream toggle: {"cmd":"stream"}
+    else if (strcmp(cmd, "stream") == 0 && _streamCb) {
+        _streamCb();
+    }
+    // State change: {"cmd":"state","to":"IDLE"}
     else if (strcmp(cmd, "state") == 0 && _stateChangeCb) {
         const char* to = doc["to"];
-        if (to) {
-            _stateChangeCb(to);
-            Serial.printf("[WEB] State change: %s\n", to);
-        }
+        if (to) _stateChangeCb(to);
     }
+    // Set PI gains: {"cmd":"gains","kpP":1.0,"kiP":0.05,"kpR":0.5,"kiR":0.03}
     else if (strcmp(cmd, "gains") == 0 && _gainCb) {
         float kpP = doc["kpP"] | 1.0f;
         float kiP = doc["kiP"] | 0.05f;
         float kpR = doc["kpR"] | 0.5f;
         float kiR = doc["kiR"] | 0.03f;
         _gainCb(kpP, kiP, kpR, kiR);
-        Serial.printf("[WEB] Gains set: kpP=%.2f kiP=%.2f kpR=%.2f kiR=%.2f\n", kpP, kiP, kpR, kiR);
     }
+    // Set tolerance: {"cmd":"tolerance","deg":0.5}
     else if (strcmp(cmd, "tolerance") == 0 && _toleranceCb) {
         float deg = doc["deg"] | 0.5f;
         _toleranceCb(deg);
-        Serial.printf("[WEB] Tolerance set: %.2f deg\n", deg);
     }
+    // Set stability timeout: {"cmd":"stabTimeout","sec":3.0}
+    else if (strcmp(cmd, "stabTimeout") == 0 && _stabTimeoutCb) {
+        float sec = doc["sec"] | 3.0f;
+        _stabTimeoutCb(sec);
+    }
+    // LED control: {"cmd":"led","mode":"red"}
+    else if (strcmp(cmd, "led") == 0 && _ledCb) {
+        const char* mode = doc["mode"];
+        if (mode) _ledCb(mode);
+    }
+    // Release motors: {"cmd":"release"}
     else if (strcmp(cmd, "release") == 0 && _releaseCb) {
         _releaseCb();
-        Serial.println("[WEB] Motors released");
+    }
+    // Raw serial passthrough: {"cmd":"serial","text":"mpos"}
+    else if (strcmp(cmd, "serial") == 0 && _serialCb) {
+        const char* text = doc["text"];
+        if (text) _serialCb(text);
     }
 }

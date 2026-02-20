@@ -108,11 +108,11 @@ self_leveing_prism/
 
 ## Next Steps
 
-1. [ ] Commit uncommitted work (NVS persistence, ledtest, setPosition methods)
-2. [ ] Safe shutdown on long press — save motor positions to NVS, enter low-power mode (013)
-3. [ ] Web dashboard & test mode portal — ESP32 AP mode, LittleFS, WebSocket (014, ~3-5 sessions)
-4. [ ] Find and set motor limits using GUI (IN/OUT positions for both motors) (011)
-5. [ ] Fix Motor 2 direction in leveling controller (part of 012)
+1. [ ] Commit uncommitted work (NVS persistence, ledtest, setPosition methods, M2 direction fix)
+2. [ ] Configurable stability lockout timer — `st <sec>` serial command, default 3s (015)
+3. [ ] Safe shutdown on long press — save motor positions to NVS, enter low-power mode (013)
+4. [ ] Web dashboard & test mode portal — ESP32 AP mode, LittleFS, WebSocket (014, ~3-5 sessions)
+5. [ ] Find and set motor limits using GUI (IN/OUT positions for both motors) (011)
 6. [ ] Full closed-loop leveling test with button press (012)
 7. [ ] Set up Notion sync (optional - requires API key)
 
@@ -154,32 +154,30 @@ self_leveing_prism/
 **Last Session:** 2026-02-20
 
 **What We Were Working On:**
-Planning session — captured safe shutdown feature and web dashboard feature requests. Fleshed out all roadmap files.
+Planning session — captured stability lockout timer, safe shutdown, and web dashboard feature requests. Fleshed out all roadmap files.
 
 **Where We Left Off:**
-1. **Uncommitted code in working tree** — Motor position NVS persistence (`saveMotorPositions()`/`loadMotorPositions()` in main.cpp), `setPosition1()`/`setPosition2()` in StepperController.h, and `ledtest` command. These should be committed first.
-2. **New feature: Safe Shutdown (013)** — Long press button → save motor positions to NVS → enter safe power-off mode. See `roadmap/planned/013-safe-shutdown.md`.
-3. **New feature: Web Dashboard (014)** — ESP32 WiFi AP mode, LittleFS-hosted web UI with real-time dashboard and full test mode controls via WebSocket. See `roadmap/planned/014-web-dashboard.md`. User chose: AP mode, LittleFS, full controls (motors + IMU + serial CLI mirror).
-4. **Planned features fully detailed** — 011 (find motor limits) and 012 (closed-loop leveling test) also have complete technical approaches.
+1. **Uncommitted code in working tree** — Motor position NVS persistence, `setPosition1()`/`setPosition2()`, `ledtest` command, Motor 2 direction fix in leveling controller, test GUI auto-connect. Commit these first.
+2. **New feature: Stability Lockout Timer (015)** — Make `STABILITY_TIMEOUT_MS` runtime-configurable via `st <seconds>` serial command. Default 3s. Quick win — only touches types.h and main.cpp. See `roadmap/planned/015-stability-lockout-timer.md`.
+3. **New feature: Safe Shutdown (013)** — Long press → save motor positions to NVS → safe power-off mode. NVS code already exists. See `roadmap/planned/013-safe-shutdown.md`.
+4. **New feature: Web Dashboard (014)** — ESP32 WiFi AP, LittleFS web UI, WebSocket real-time data + full test controls. See `roadmap/planned/014-web-dashboard.md`. ~3-5 sessions.
+5. **Planned features 011/012** — Find motor limits + closed-loop leveling test, fully detailed.
 
 **What Needs to Happen Next:**
-- Commit the uncommitted NVS persistence code first
+- Commit the uncommitted code first
+- Build 015 (stability lockout timer) — very quick, ~30 min
 - Build 013 (safe shutdown) — quick win, NVS code already exists
 - Start 014 (web dashboard) — major feature, ~3-5 sessions
-  - Session 1: WiFi AP + AsyncWebServer + LittleFS foundation
-  - Session 2: WebSocket status streaming + command handling
-  - Session 3: Dashboard UI (dark theme, bubble level, motor bars)
-  - Session 4: Test mode UI (motor buttons, PI tuning, serial terminal)
-  - Session 5: Polish and integration testing
-- Motor 2 direction reversal still only in GUI — firmware needs fix (part of 012)
+- Find motor limits (011) and full leveling test (012) when hardware testing
 
 **Important Context:**
 - PlatformIO ESP32 project. Build with `pio run`, upload with `pio run -t upload`.
 - LittleFS upload: `pio run -t uploadfs` (files in `data/` folder)
 - Motor limits GUI: `python tools/motor_limits_gui.py`
 - Current config.h limits: MIN=0, MAX=70000 (placeholder, needs real values from testing)
-- NVS persistence code already exists in uncommitted main.cpp — save/load motor positions works
-- Button handler already has long press detection (BUTTON_LONG_PRESS_MS = 2000ms in config.h)
+- NVS persistence code already exists in uncommitted main.cpp
+- Closed-loop leveling verified working (Motor 2 direction fixed in leveling controller)
+- `STABILITY_TIMEOUT_MS` is currently 3000ms compile-time; 015 makes it runtime
 - Web dashboard libraries needed: ESPAsyncWebServer, AsyncTCP, ArduinoJson
 - ESP32 AP default IP: 192.168.4.1
 

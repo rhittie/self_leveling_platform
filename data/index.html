@@ -15,85 +15,243 @@
         </div>
     </header>
 
+    <nav class="tabs">
+        <button class="tab active" data-tab="dashboard">Dashboard</button>
+        <button class="tab" data-tab="testmode">Test Mode</button>
+        <button class="tab" data-tab="limits">Motor Limits</button>
+        <button class="tab" data-tab="terminal">Terminal</button>
+    </nav>
+
     <main>
-        <!-- Angles & Bubble Level -->
-        <section class="card angles-card">
-            <div class="angle-readouts">
-                <div class="angle-box">
-                    <span class="label">Pitch</span>
-                    <span id="pitch" class="value">0.00</span><span class="unit">&deg;</span>
+        <!-- ==================== DASHBOARD TAB ==================== -->
+        <div id="tab-dashboard" class="tab-content active">
+            <section class="card angles-card">
+                <div class="angle-readouts">
+                    <div class="angle-box">
+                        <span class="label">Pitch</span>
+                        <span id="pitch" class="value">0.00</span><span class="unit">&deg;</span>
+                    </div>
+                    <div class="angle-box">
+                        <span class="label">Roll</span>
+                        <span id="roll" class="value">0.00</span><span class="unit">&deg;</span>
+                    </div>
                 </div>
-                <div class="angle-box">
-                    <span class="label">Roll</span>
-                    <span id="roll" class="value">0.00</span><span class="unit">&deg;</span>
+                <canvas id="bubble" width="200" height="200"></canvas>
+            </section>
+
+            <section class="card">
+                <h2>Motors</h2>
+                <div class="motor-row">
+                    <span class="motor-label">M1</span>
+                    <div class="bar-bg"><div id="m1bar" class="bar-fill"></div></div>
+                    <span id="m1val" class="motor-val">0</span>
                 </div>
-            </div>
-            <canvas id="bubble" width="200" height="200"></canvas>
-        </section>
+                <div class="motor-row">
+                    <span class="motor-label">M2</span>
+                    <div class="bar-bg"><div id="m2bar" class="bar-fill"></div></div>
+                    <span id="m2val" class="motor-val">0</span>
+                </div>
+            </section>
 
-        <!-- Motor Positions -->
-        <section class="card">
-            <h2>Motors</h2>
-            <div class="motor-row">
-                <span class="motor-label">M1</span>
-                <div class="bar-bg"><div id="m1bar" class="bar-fill"></div></div>
-                <span id="m1val" class="motor-val">0</span>
-            </div>
-            <div class="motor-row">
-                <span class="motor-label">M2</span>
-                <div class="bar-bg"><div id="m2bar" class="bar-fill"></div></div>
-                <span id="m2val" class="motor-val">0</span>
-            </div>
-        </section>
+            <section class="card">
+                <h2>IMU Data</h2>
+                <div class="data-grid">
+                    <span class="dlbl">Accel</span><span id="accel" class="dval">0, 0, 0 g</span>
+                    <span class="dlbl">Gyro</span><span id="gyro" class="dval">0, 0, 0 &deg;/s</span>
+                    <span class="dlbl">Temp</span><span id="temp" class="dval">0 &deg;C</span>
+                    <span class="dlbl">Cal</span><span id="cal" class="dval">No</span>
+                    <span class="dlbl">Uptime</span><span id="uptime" class="dval">0s</span>
+                </div>
+            </section>
 
-        <!-- Motor Controls -->
-        <section class="card">
-            <h2>Motor Controls</h2>
-            <div class="motor-ctrl">
-                <span class="ctrl-label">M1</span>
-                <button onclick="mv(1,-1000)">-1000</button>
-                <button onclick="mv(1,-100)">-100</button>
-                <button onclick="mv(1,-10)">-10</button>
-                <button onclick="mv(1,10)">+10</button>
-                <button onclick="mv(1,100)">+100</button>
-                <button onclick="mv(1,1000)">+1000</button>
-            </div>
-            <div class="motor-ctrl">
-                <span class="ctrl-label">M2</span>
-                <button onclick="mv(2,1000)">-1000</button>
-                <button onclick="mv(2,100)">-100</button>
-                <button onclick="mv(2,10)">-10</button>
-                <button onclick="mv(2,-10)">+10</button>
-                <button onclick="mv(2,-100)">+100</button>
-                <button onclick="mv(2,-1000)">+1000</button>
-            </div>
-        </section>
+            <section class="card">
+                <h2>Quick Actions</h2>
+                <div class="action-grid">
+                    <button class="action-btn green" onclick="send({cmd:'state',to:'INITIALIZING'})">Start Leveling</button>
+                    <button class="action-btn blue" onclick="send({cmd:'state',to:'IDLE'})">Reset to IDLE</button>
+                    <button class="action-btn yellow" onclick="send({cmd:'calibrate'})">Calibrate IMU</button>
+                    <button class="action-btn gray" onclick="send({cmd:'release'})">Release Motors</button>
+                </div>
+            </section>
+        </div>
 
-        <!-- Actions -->
-        <section class="card">
-            <h2>Actions</h2>
-            <div class="action-grid">
-                <button class="action-btn green" onclick="send({cmd:'state',to:'INITIALIZING'})">Start Leveling</button>
-                <button class="action-btn blue" onclick="send({cmd:'state',to:'IDLE'})">Reset to IDLE</button>
-                <button class="action-btn yellow" onclick="send({cmd:'calibrate'})">Calibrate IMU</button>
-                <button class="action-btn gray" onclick="send({cmd:'release'})">Release Motors</button>
-                <button class="action-btn gray" onclick="send({cmd:'mreset'})">Reset Positions</button>
-            </div>
-        </section>
+        <!-- ==================== TEST MODE TAB ==================== -->
+        <div id="tab-testmode" class="tab-content">
+            <section class="card">
+                <h2>Motor Controls</h2>
+                <div class="motor-ctrl">
+                    <span class="ctrl-label">M1</span>
+                    <button onclick="mv(1,-1000)">-1k</button>
+                    <button onclick="mv(1,-100)">-100</button>
+                    <button onclick="mv(1,-10)">-10</button>
+                    <button onclick="mv(1,10)">+10</button>
+                    <button onclick="mv(1,100)">+100</button>
+                    <button onclick="mv(1,1000)">+1k</button>
+                </div>
+                <div class="motor-ctrl">
+                    <span class="ctrl-label">M2</span>
+                    <button onclick="mv(2,1000)">-1k</button>
+                    <button onclick="mv(2,100)">-100</button>
+                    <button onclick="mv(2,10)">-10</button>
+                    <button onclick="mv(2,-10)">+10</button>
+                    <button onclick="mv(2,-100)">+100</button>
+                    <button onclick="mv(2,-1000)">+1k</button>
+                </div>
+                <div class="motor-ctrl">
+                    <span class="ctrl-label">Both</span>
+                    <button onclick="mvBoth(-1000)">-1k</button>
+                    <button onclick="mvBoth(-100)">-100</button>
+                    <button onclick="mvBoth(-10)">-10</button>
+                    <button onclick="mvBoth(10)">+10</button>
+                    <button onclick="mvBoth(100)">+100</button>
+                    <button onclick="mvBoth(1000)">+1k</button>
+                </div>
+                <div class="btn-row">
+                    <button class="action-btn red" onclick="send({cmd:'mstop'})">Stop All</button>
+                    <button class="action-btn gray" onclick="send({cmd:'mreset'})">Reset Pos</button>
+                    <button class="action-btn gray" onclick="send({cmd:'release'})">Release</button>
+                </div>
+                <div class="inline-ctrl">
+                    <label>Speed RPM</label>
+                    <input id="rpmIn" type="number" min="1" max="15" value="10" style="width:60px">
+                    <button class="sm-btn" onclick="send({cmd:'mspeed',value:+document.getElementById('rpmIn').value})">Set</button>
+                </div>
+            </section>
 
-        <!-- PI Tuning -->
-        <section class="card">
-            <h2>PI Tuning</h2>
-            <div class="tune-grid">
-                <label>Kp Pitch</label><input id="kpP" type="number" step="0.1" value="1.0">
-                <label>Ki Pitch</label><input id="kiP" type="number" step="0.01" value="0.05">
-                <label>Kp Roll</label><input id="kpR" type="number" step="0.1" value="0.5">
-                <label>Ki Roll</label><input id="kiR" type="number" step="0.01" value="0.03">
-                <label>Tolerance</label><input id="tol" type="number" step="0.1" value="0.5">
-            </div>
-            <button class="action-btn blue" onclick="sendGains()">Apply Gains</button>
-            <button class="action-btn gray" onclick="sendTol()">Apply Tolerance</button>
-        </section>
+            <section class="card">
+                <h2>IMU</h2>
+                <div class="btn-row">
+                    <button class="action-btn yellow" onclick="send({cmd:'calibrate'})">Calibrate</button>
+                    <button class="action-btn gray" onclick="send({cmd:'stream'})">Stream Toggle</button>
+                    <button class="action-btn gray" onclick="send({cmd:'scan'})">I2C Scan</button>
+                </div>
+            </section>
+
+            <section class="card">
+                <h2>LED</h2>
+                <div class="btn-row">
+                    <button class="sm-btn" onclick="send({cmd:'led',mode:'on'})">ON</button>
+                    <button class="sm-btn" onclick="send({cmd:'led',mode:'off'})">OFF</button>
+                    <button class="sm-btn" onclick="send({cmd:'led',mode:'slow'})">Slow</button>
+                    <button class="sm-btn" onclick="send({cmd:'led',mode:'fast'})">Fast</button>
+                    <button class="sm-btn" onclick="send({cmd:'led',mode:'pulse'})">Pulse</button>
+                    <button class="sm-btn" onclick="send({cmd:'led',mode:'error'})">Error</button>
+                </div>
+                <div class="btn-row" style="margin-top:8px">
+                    <button class="color-btn" style="background:#e74c3c" onclick="send({cmd:'led',mode:'red'})">R</button>
+                    <button class="color-btn" style="background:#2ecc71" onclick="send({cmd:'led',mode:'green'})">G</button>
+                    <button class="color-btn" style="background:#3498db" onclick="send({cmd:'led',mode:'blue'})">B</button>
+                    <button class="color-btn" style="background:#f1c40f;color:#000" onclick="send({cmd:'led',mode:'yellow'})">Y</button>
+                    <button class="color-btn" style="background:#00bcd4" onclick="send({cmd:'led',mode:'cyan'})">C</button>
+                    <button class="color-btn" style="background:#9b59b6" onclick="send({cmd:'led',mode:'purple'})">P</button>
+                    <button class="color-btn" style="background:#ecf0f1;color:#000" onclick="send({cmd:'led',mode:'white'})">W</button>
+                </div>
+            </section>
+
+            <section class="card">
+                <h2>Settings</h2>
+                <div class="tune-grid">
+                    <label>Kp Pitch</label><input id="kpP" type="number" step="0.1" value="1.0">
+                    <label>Ki Pitch</label><input id="kiP" type="number" step="0.01" value="0.05">
+                    <label>Kp Roll</label><input id="kpR" type="number" step="0.1" value="0.5">
+                    <label>Ki Roll</label><input id="kiR" type="number" step="0.01" value="0.03">
+                    <label>Tolerance</label><input id="tol" type="number" step="0.1" value="0.5">
+                    <label>Stab. Timeout</label><input id="stabTimeout" type="number" step="0.5" value="3.0">
+                </div>
+                <div class="btn-row">
+                    <button class="action-btn blue" onclick="sendGains()">Apply Gains</button>
+                    <button class="action-btn gray" onclick="sendTol()">Apply Tolerance</button>
+                    <button class="action-btn gray" onclick="sendStabTimeout()">Apply Timeout</button>
+                </div>
+            </section>
+
+            <section class="card">
+                <h2>State</h2>
+                <div class="btn-row">
+                    <button class="action-btn green" onclick="send({cmd:'state',to:'INITIALIZING'})">Level</button>
+                    <button class="action-btn blue" onclick="send({cmd:'state',to:'IDLE'})">IDLE</button>
+                    <button class="action-btn purple" onclick="send({cmd:'state',to:'TEST_MODE'})">Test Mode</button>
+                </div>
+            </section>
+        </div>
+
+        <!-- ==================== MOTOR LIMITS TAB ==================== -->
+        <div id="tab-limits" class="tab-content">
+            <section class="card">
+                <h2>Step Amount</h2>
+                <div class="step-selector">
+                    <button class="step-btn active" onclick="setStep(100,this)">100</button>
+                    <button class="step-btn" onclick="setStep(500,this)">500</button>
+                    <button class="step-btn" onclick="setStep(1000,this)">1k</button>
+                    <button class="step-btn" onclick="setStep(5000,this)">5k</button>
+                    <button class="step-btn" onclick="setStep(10000,this)">10k</button>
+                    <input id="customStep" type="number" value="" placeholder="Custom" style="width:70px">
+                    <button class="sm-btn" onclick="setStep(+document.getElementById('customStep').value)">Set</button>
+                </div>
+            </section>
+
+            <section class="card">
+                <h2>Both Motors</h2>
+                <div class="limit-both">
+                    <button class="big-btn red" onclick="mvBothLimit(-1)">&#x25BC; IN</button>
+                    <button class="big-btn green" onclick="mvBothLimit(1)">&#x25B2; OUT</button>
+                </div>
+            </section>
+
+            <section class="card">
+                <h2>Motor 1</h2>
+                <div class="limit-pos" id="m1limpos">0</div>
+                <div class="limit-ctrl">
+                    <button class="big-btn red" onclick="mvLimit(1,-1)">&#x25BC;</button>
+                    <button class="action-btn gray" onclick="zeroMotor(1)">Set Zero</button>
+                    <button class="big-btn green" onclick="mvLimit(1,1)">&#x25B2;</button>
+                </div>
+                <div class="limit-set-row">
+                    <button class="action-btn blue" onclick="setIN(1)">Set IN (min)</button>
+                    <span id="m1in" class="limit-val">--</span>
+                    <button class="action-btn yellow" onclick="setOUT(1)">Set OUT (max)</button>
+                    <span id="m1out" class="limit-val">--</span>
+                </div>
+            </section>
+
+            <section class="card">
+                <h2>Motor 2</h2>
+                <div class="limit-pos" id="m2limpos">0</div>
+                <div class="limit-ctrl">
+                    <button class="big-btn red" onclick="mvLimit(2,-1)">&#x25BC;</button>
+                    <button class="action-btn gray" onclick="zeroMotor(2)">Set Zero</button>
+                    <button class="big-btn green" onclick="mvLimit(2,1)">&#x25B2;</button>
+                </div>
+                <div class="limit-set-row">
+                    <button class="action-btn blue" onclick="setIN(2)">Set IN (min)</button>
+                    <span id="m2in" class="limit-val">--</span>
+                    <button class="action-btn yellow" onclick="setOUT(2)">Set OUT (max)</button>
+                    <span id="m2out" class="limit-val">--</span>
+                </div>
+            </section>
+
+            <section class="card">
+                <h2>Config Values</h2>
+                <pre id="configOutput">// Set IN and OUT for both motors first</pre>
+                <div class="btn-row">
+                    <button class="action-btn blue" onclick="copyConfig()">Copy to Clipboard</button>
+                    <button class="action-btn gray" onclick="send({cmd:'munlock'})">Unlock Limits</button>
+                    <button class="action-btn gray" onclick="send({cmd:'mlock'})">Lock Limits</button>
+                </div>
+            </section>
+        </div>
+
+        <!-- ==================== SERIAL TERMINAL TAB ==================== -->
+        <div id="tab-terminal" class="tab-content">
+            <section class="card terminal-card">
+                <div id="termOutput" class="term-output"></div>
+                <div class="term-input-row">
+                    <input id="termInput" type="text" placeholder="Type command..." onkeydown="if(event.key==='Enter')sendTerminal()">
+                    <button class="action-btn blue" onclick="sendTerminal()">Send</button>
+                    <button class="action-btn gray" onclick="document.getElementById('termOutput').textContent=''">Clear</button>
+                </div>
+            </section>
+        </div>
     </main>
 
     <script src="app.js"></script>
