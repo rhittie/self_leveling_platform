@@ -73,6 +73,8 @@ public:
     void resetPositions();
     void resetPosition1() { _position1 = 0; }
     void resetPosition2() { _position2 = 0; }
+    void setPosition1(long pos) { _position1 = pos; }
+    void setPosition2(long pos) { _position2 = pos; }
 
     /**
      * Check if motor 1 is at a position limit

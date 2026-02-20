@@ -14,6 +14,7 @@
 
 #include <Arduino.h>
 #include <Wire.h>
+#include <Preferences.h>
 #include "config.h"
 #include "types.h"
 #include "MPU6050Handler.h"
@@ -31,6 +32,7 @@ StepperController motors;
 LevelingController leveling;
 ButtonHandler button(PIN_BUTTON, true);  // Active low with pull-up
 StatusLED statusLED(PIN_LED_RED, PIN_LED_GREEN, PIN_LED_BLUE);  // RGB LED in push button
+Preferences prefs;
 
 // ============================================================================
 // State Machine
@@ -80,6 +82,31 @@ void printIMUData();
 void printTestModeMenu();
 void scanI2CBus();
 void printPinInfo();
+void saveMotorPositions();
+void loadMotorPositions();
+
+// ============================================================================
+// Motor Position Persistence
+// ============================================================================
+
+void saveMotorPositions() {
+    prefs.begin("motors", false);  // read-write
+    prefs.putLong("m1pos", motors.getPosition1());
+    prefs.putLong("m2pos", motors.getPosition2());
+    prefs.end();
+    Serial.printf("[SAVE] Motor positions saved: M1=%ld M2=%ld\n",
+                  motors.getPosition1(), motors.getPosition2());
+}
+
+void loadMotorPositions() {
+    prefs.begin("motors", true);  // read-only
+    long m1 = prefs.getLong("m1pos", 0);
+    long m2 = prefs.getLong("m2pos", 0);
+    prefs.end();
+    motors.setPosition1(m1);
+    motors.setPosition2(m2);
+    Serial.printf("[LOAD] Motor positions restored: M1=%ld M2=%ld\n", m1, m2);
+}
 
 // ============================================================================
 // Setup
@@ -107,6 +134,7 @@ void setup() {
     button.begin();
     statusLED.begin();
     motors.begin();
+    loadMotorPositions();
 
     // Start in IDLE state
     changeState(SystemState::IDLE);
@@ -205,6 +233,7 @@ void changeState(SystemState newState) {
             statusLED.setColor(LEDColors::OFF);
             statusLED.setPattern(LEDPattern::OFF);
             motors.release();
+            saveMotorPositions();
             break;
 
         case SystemState::INITIALIZING:
@@ -229,6 +258,7 @@ void changeState(SystemState newState) {
             statusLED.setColor(LEDColors::GREEN);
             statusLED.setPattern(LEDPattern::DOUBLE_PULSE);
             motors.release();  // Save power when level
+            saveMotorPositions();
             break;
 
         case SystemState::ERROR:
@@ -890,6 +920,56 @@ void handleTestModeCommands(String& input) {
         return;
     }
 
+    // ledtest - raw GPIO test bypassing LEDC, tests each pin individually
+    if (input.equalsIgnoreCase("ledtest")) {
+        Serial.println("LED raw GPIO test - bypassing LEDC PWM:");
+        uint8_t pins[] = {PIN_LED_RED, PIN_LED_GREEN, PIN_LED_BLUE};
+        const char* names[] = {"RED", "GREEN", "BLUE"};
+
+        // Detach LEDC first so we can use raw GPIO
+        ledcDetachPin(PIN_LED_RED);
+        ledcDetachPin(PIN_LED_GREEN);
+        ledcDetachPin(PIN_LED_BLUE);
+
+        for (int i = 0; i < 3; i++) {
+            pinMode(pins[i], OUTPUT);
+        }
+
+        // Test each color HIGH
+        for (int i = 0; i < 3; i++) {
+            Serial.printf("  %s (GPIO %d) HIGH... ", names[i], pins[i]);
+            digitalWrite(pins[i], HIGH);
+            delay(1500);
+            digitalWrite(pins[i], LOW);
+            Serial.println("done");
+            delay(300);
+        }
+
+        // Now test inverted (LOW = on for common anode)
+        Serial.println("  Now testing INVERTED (for common anode):");
+        for (int i = 0; i < 3; i++) {
+            // All HIGH first (off for common anode)
+            for (int j = 0; j < 3; j++) digitalWrite(pins[j], HIGH);
+            Serial.printf("  %s (GPIO %d) LOW... ", names[i], pins[i]);
+            digitalWrite(pins[i], LOW);
+            delay(1500);
+            digitalWrite(pins[i], HIGH);
+            Serial.println("done");
+            delay(300);
+        }
+
+        // All off
+        for (int i = 0; i < 3; i++) digitalWrite(pins[i], LOW);
+
+        // Re-attach LEDC
+        ledcAttachPin(PIN_LED_RED, LEDC_CHANNEL_RED);
+        ledcAttachPin(PIN_LED_GREEN, LEDC_CHANNEL_GREEN);
+        ledcAttachPin(PIN_LED_BLUE, LEDC_CHANNEL_BLUE);
+
+        Serial.println("LED test complete. If inverted worked, your LED is common anode.");
+        return;
+    }
+
     // ==================== Motor Commands ====================
 
     // m1 <steps> or m2 <steps>
@@ -960,6 +1040,16 @@ void handleTestModeCommands(String& input) {
     if (input.equalsIgnoreCase("mreset2")) {
         motors.resetPosition2();
         Serial.printf("[MRESET] M2 reset to 0 (M1 still at %ld)\n", motors.getPosition1());
+        return;
+    }
+
+    // mset <pos> - set both motor position counters to a value
+    if (input.startsWith("mset ") || input.startsWith("MSET ")) {
+        long pos = input.substring(5).toInt();
+        motors.setPosition1(pos);
+        motors.setPosition2(pos);
+        saveMotorPositions();
+        Serial.printf("[MSET] Both motors set to %ld\n", pos);
         return;
     }
 

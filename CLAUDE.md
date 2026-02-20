@@ -55,7 +55,7 @@ self_leveing_prism/
 
 ## Current State
 
-**Last Updated:** 2026-02-06
+**Last Updated:** 2026-02-20
 
 **What's Working:**
 - [x] State machine: IDLE → INITIALIZING → WAIT_FOR_STABLE → LEVELING → LEVEL_OK
@@ -70,12 +70,21 @@ self_leveing_prism/
 - [x] Motor positions in stream output and continuous logging
 - [x] `mpos` and `mreset` serial commands
 - [x] Dashboard GUI tab with bubble level and motor position bars
+- [x] RGB LED status indicator in push button
+- [x] Motor 2 coil wiring corrected (pin order 16,13,15,4)
+- [x] Motor limits GUI with direct serial, both-motors control, M2 direction fix
+
+**What's Uncommitted (in working tree):**
+- [x] Motor position persistence via ESP32 NVS (Preferences library) — saves/loads on boot
+- [x] `setPosition1()`/`setPosition2()` methods in StepperController
+- [x] `ledtest` serial command for raw GPIO LED testing (common anode detection)
 
 **What's In Progress:**
 - (none)
 
-**What's Broken:**
-- (none)
+**What's Broken/Known Gaps:**
+- Motor 2 direction inversion only in GUI — leveling controller doesn't invert M2 yet
+- Motor limits (MIN=0, MAX=70000) are placeholders — need real values from physical testing
 
 ## Completed Features
 
@@ -95,10 +104,13 @@ self_leveing_prism/
 
 ## Next Steps
 
-1. [ ] Find and set motor limits using GUI (IN/OUT positions for both motors)
-2. [ ] Update config.h with final MOTOR_MIN/MAX_POSITION values
-3. [ ] Full closed-loop leveling test with button press
-4. [ ] Set up Notion sync (optional - requires API key)
+1. [ ] Commit uncommitted work (NVS persistence, ledtest, setPosition methods)
+2. [ ] Safe shutdown on long press — save motor positions to NVS, enter low-power mode (013)
+3. [ ] Web dashboard & test mode portal — ESP32 AP mode, LittleFS, WebSocket (014, ~3-5 sessions)
+4. [ ] Find and set motor limits using GUI (IN/OUT positions for both motors) (011)
+5. [ ] Fix Motor 2 direction in leveling controller (part of 012)
+6. [ ] Full closed-loop leveling test with button press (012)
+7. [ ] Set up Notion sync (optional - requires API key)
 
 ## Decisions Made
 
@@ -121,6 +133,10 @@ self_leveing_prism/
 | Motor 2 pin order: 16,13,15,4 | Original order (16,4,15,13) caused humming; coils needed reordering | 2026-02-19 |
 | Direct serial writes in GUI | Worker thread queue caused intermittent Motor 2 failures; direct writes work reliably | 2026-02-19 |
 | Motor 2 GUI direction reversed | Lead screw orientation means positive firmware steps = retract; GUI flips for intuitive +/- | 2026-02-19 |
+| WiFi Access Point mode for web UI | No router dependency; works anywhere; ESP32 creates "LevelingPrism" network | 2026-02-20 |
+| LittleFS for web UI storage | Separate HTML/CSS/JS files; easier to edit; requires `pio run -t uploadfs` | 2026-02-20 |
+| WebSocket for real-time data | Bidirectional, low-latency; 10 Hz status JSON + command JSON; ESPAsyncWebServer | 2026-02-20 |
+| Full test controls in web UI | Motors + IMU + serial CLI mirror; replaces need for USB serial in most cases | 2026-02-20 |
 
 ## Known Issues & Bugs
 
@@ -129,30 +145,37 @@ self_leveing_prism/
 
 ## Session Handoff Notes
 
-**Last Session:** 2026-02-19
+**Last Session:** 2026-02-20
 
 **What We Were Working On:**
-Motor 2 wiring fix and motor limits GUI improvements
+Planning session — captured safe shutdown feature and web dashboard feature requests. Fleshed out all roadmap files.
 
 **Where We Left Off:**
-Both motors working correctly through the GUI. Ready to find physical motor limits.
-
-1. **Motor 2 coil fix** — Original pin order (16,4,15,13) caused humming. Correct order is (16,13,15,4) — confirmed via coiltest command and serial monitor testing.
-2. **GUI serial rewrite** — Worker thread queue caused intermittent Motor 2 failures. Replaced with direct serial writes + threading lock. All motor commands now reliable.
-3. **Motor 2 direction** — Lead screw is physically reversed vs Motor 1. GUI flips direction so +/- is intuitive (+ = extend out, - = retract in for both motors).
-4. **Both-motors control** — Added to GUI for simultaneous movement when finding limits.
-5. **Screw was blocking** — User found a screw blocking Motor 2's lead screw rotation; removed it.
+1. **Uncommitted code in working tree** — Motor position NVS persistence (`saveMotorPositions()`/`loadMotorPositions()` in main.cpp), `setPosition1()`/`setPosition2()` in StepperController.h, and `ledtest` command. These should be committed first.
+2. **New feature: Safe Shutdown (013)** — Long press button → save motor positions to NVS → enter safe power-off mode. See `roadmap/planned/013-safe-shutdown.md`.
+3. **New feature: Web Dashboard (014)** — ESP32 WiFi AP mode, LittleFS-hosted web UI with real-time dashboard and full test mode controls via WebSocket. See `roadmap/planned/014-web-dashboard.md`. User chose: AP mode, LittleFS, full controls (motors + IMU + serial CLI mirror).
+4. **Planned features fully detailed** — 011 (find motor limits) and 012 (closed-loop leveling test) also have complete technical approaches.
 
 **What Needs to Happen Next:**
-- Use motor limits GUI to find IN (min) and OUT (max) positions for both motors
-- Update MOTOR_MIN_POSITION and MOTOR_MAX_POSITION in config.h with actual values
-- Full closed-loop leveling test
-- Note: Motor 2 direction reversal is only in the GUI — firmware and leveling controller may need a direction flag too
+- Commit the uncommitted NVS persistence code first
+- Build 013 (safe shutdown) — quick win, NVS code already exists
+- Start 014 (web dashboard) — major feature, ~3-5 sessions
+  - Session 1: WiFi AP + AsyncWebServer + LittleFS foundation
+  - Session 2: WebSocket status streaming + command handling
+  - Session 3: Dashboard UI (dark theme, bubble level, motor bars)
+  - Session 4: Test mode UI (motor buttons, PI tuning, serial terminal)
+  - Session 5: Polish and integration testing
+- Motor 2 direction reversal still only in GUI — firmware needs fix (part of 012)
 
 **Important Context:**
 - PlatformIO ESP32 project. Build with `pio run`, upload with `pio run -t upload`.
+- LittleFS upload: `pio run -t uploadfs` (files in `data/` folder)
 - Motor limits GUI: `python tools/motor_limits_gui.py`
 - Current config.h limits: MIN=0, MAX=70000 (placeholder, needs real values from testing)
+- NVS persistence code already exists in uncommitted main.cpp — save/load motor positions works
+- Button handler already has long press detection (BUTTON_LONG_PRESS_MS = 2000ms in config.h)
+- Web dashboard libraries needed: ESPAsyncWebServer, AsyncTCP, ArduinoJson
+- ESP32 AP default IP: 192.168.4.1
 
 ---
 
@@ -191,6 +214,8 @@ admin     - Enter test mode
 ```
 mpos      - Query motor positions and limits
 mreset    - Reset motor position counters to zero
+ledtest   - Raw GPIO LED test (common anode detection)
+coiltest  - Test motor coil wiring sequence
 ```
 
 ---

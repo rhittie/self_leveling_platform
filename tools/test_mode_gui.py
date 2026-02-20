@@ -35,6 +35,7 @@ class TestModeGUI:
         self.read_thread = None
         self.stop_thread = False
         self.message_queue = queue.Queue()
+        self.send_queue = queue.Queue()
 
         # Track toggle states
         self.imu_streaming = False
@@ -419,10 +420,11 @@ class TestModeGUI:
 
         btn_frame2 = ttk.Frame(m2_frame)
         btn_frame2.grid(row=1, column=0, columnspan=2, pady=5)
+        # Motor 2 direction reversed (lead screw orientation)
         ttk.Button(btn_frame2, text="Move +", width=10,
-                   command=lambda: self.send_command(f"m2 {self.m2_steps.get()}")).pack(side="left", padx=2)
-        ttk.Button(btn_frame2, text="Move -", width=10,
                    command=lambda: self.send_command(f"m2 -{self.m2_steps.get()}")).pack(side="left", padx=2)
+        ttk.Button(btn_frame2, text="Move -", width=10,
+                   command=lambda: self.send_command(f"m2 {self.m2_steps.get()}")).pack(side="left", padx=2)
 
         self.m2c_btn = ttk.Button(m2_frame, text="Continuous: OFF", width=20,
                                    command=self.toggle_m2_continuous)
@@ -454,8 +456,9 @@ class TestModeGUI:
             btn_row.pack()
             ttk.Button(btn_row, text="M1", width=4,
                        command=lambda s=steps: self.send_command(f"m1 {s}")).pack(side="left")
+            # Motor 2 reversed
             ttk.Button(btn_row, text="M2", width=4,
-                       command=lambda s=steps: self.send_command(f"m2 {s}")).pack(side="left")
+                       command=lambda s=steps: self.send_command(f"m2 -{s}")).pack(side="left")
 
     def setup_imu_tab(self, parent):
         """Setup IMU/MPU6050 testing tab."""
@@ -638,7 +641,7 @@ class TestModeGUI:
             return
 
         try:
-            self.serial_port = serial.Serial(port, baud, timeout=0.1)
+            self.serial_port = serial.Serial(port, baud, timeout=0.2)
             self.is_connected = True
             self.stop_thread = False
 
@@ -677,17 +680,32 @@ class TestModeGUI:
         self.log_output("Disconnected\n")
 
     def read_serial(self):
-        """Background thread to read serial data."""
+        """Background thread — the ONLY thread that touches the serial port.
+        Sends queued commands, then reads any available data."""
         while not self.stop_thread:
             try:
-                if self.serial_port and self.serial_port.in_waiting:
-                    data = self.serial_port.readline().decode("utf-8", errors="replace")
-                    if data:
-                        self.message_queue.put(data)
+                if not self.serial_port or not self.serial_port.is_open:
+                    time.sleep(0.1)
+                    continue
+
+                # Send any queued commands first
+                while not self.send_queue.empty():
+                    try:
+                        cmd = self.send_queue.get_nowait()
+                        self.serial_port.write(f"{cmd}\n".encode())
+                        time.sleep(0.05)  # Brief pause after write
+                    except queue.Empty:
+                        break
+
+                # Read available data
+                data = self.serial_port.readline().decode("utf-8", errors="replace")
+                if data:
+                    self.message_queue.put(data)
+
             except Exception as e:
                 if not self.stop_thread:
                     self.message_queue.put(f"[Error: {e}]\n")
-            time.sleep(0.01)
+                time.sleep(0.1)
 
     def process_queue(self):
         """Process messages from the read thread."""
@@ -722,16 +740,14 @@ class TestModeGUI:
         self.output_text.config(state="disabled")
 
     def send_command(self, cmd):
-        """Send a command to the device."""
+        """Queue a command to be sent by the read thread (only thread that
+        touches the serial port)."""
         if not self.is_connected:
             messagebox.showwarning("Not Connected", "Please connect to a device first")
             return
 
-        try:
-            self.serial_port.write(f"{cmd}\n".encode())
-            self.log_output(f"> {cmd}\n")
-        except Exception as e:
-            messagebox.showerror("Send Error", str(e))
+        self.send_queue.put(cmd)
+        self.log_output(f"> {cmd}\n")
 
     def send_manual_command(self):
         """Send the manual command entry."""

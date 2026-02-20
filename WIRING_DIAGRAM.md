@@ -113,7 +113,6 @@ Orientation: antenna/chip at top, USB connector at bottom, looking down at the t
   |                   |        |                    |
   |  VCC  o-----------+--> 5V from DC Converter     |
   |  GND  o-----------+--> GND (common ground)      |
-  |                   |        |                    |
   |  [Motor Plug]     |        +--------------------+
   |   to 28BYJ-48 #1  |
   +-------------------+
