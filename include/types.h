@@ -14,7 +14,8 @@ enum class SystemState {
     LEVELING,       // Actively adjusting motors
     LEVEL_OK,       // Platform is level, monitoring
     ERROR,          // Fault condition
-    TEST_MODE       // Admin/test mode for component testing
+    TEST_MODE,      // Admin/test mode for component testing
+    SAFE_SHUTDOWN   // Positions saved, safe to power off
 };
 
 // Convert state to string for debugging
@@ -27,6 +28,7 @@ inline const char* stateToString(SystemState state) {
         case SystemState::LEVEL_OK:       return "LEVEL_OK";
         case SystemState::ERROR:          return "ERROR";
         case SystemState::TEST_MODE:      return "TEST_MODE";
+        case SystemState::SAFE_SHUTDOWN:  return "SAFE_SHUTDOWN";
         default:                          return "UNKNOWN";
     }
 }

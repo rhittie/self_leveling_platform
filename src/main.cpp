@@ -160,9 +160,10 @@ void loop() {
 
     // Handle button events globally
     if (buttonEvent == ButtonEvent::LONG_PRESS) {
-        // Long press always returns to IDLE
-        Serial.println("Long press detected - returning to IDLE");
-        changeState(SystemState::IDLE);
+        // Long press triggers safe shutdown — save positions and halt
+        Serial.println("Long press detected - safe shutdown");
+        saveMotorPositions();
+        changeState(SystemState::SAFE_SHUTDOWN);
         return;
     }
 
@@ -200,6 +201,14 @@ void loop() {
 
         case SystemState::TEST_MODE:
             handleTestModeState();
+            break;
+
+        case SystemState::SAFE_SHUTDOWN:
+            // Halted — short press wakes back to IDLE
+            if (buttonEvent == ButtonEvent::SHORT_PRESS) {
+                Serial.println("Short press detected - waking from shutdown");
+                changeState(SystemState::IDLE);
+            }
             break;
     }
 
@@ -278,6 +287,14 @@ void changeState(SystemState newState) {
             statusLED.setColor(LEDColors::PURPLE);
             statusLED.setPattern(LEDPattern::SOLID);
             printTestModeMenu();
+            break;
+
+        case SystemState::SAFE_SHUTDOWN:
+            statusLED.setColor(LEDColors::GREEN);
+            statusLED.setPattern(LEDPattern::SOLID);
+            motors.release();
+            Serial.println("=== SAFE TO POWER OFF ===");
+            Serial.println("Motor positions saved. Short press to wake.");
             break;
     }
 }
