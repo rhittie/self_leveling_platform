@@ -79,6 +79,10 @@ self_leveing_prism/
 - [x] `setPosition1()`/`setPosition2()` methods in StepperController
 - [x] `ledtest` serial command for raw GPIO LED testing (common anode detection)
 
+- [x] Motor 2 direction fixed in leveling controller (lead screw reversal)
+- [x] Test GUI auto-enters test mode and queries mpos on connect
+- [x] Full closed-loop leveling verified working!
+
 **What's In Progress:**
 - (none)
 
@@ -137,6 +141,8 @@ self_leveing_prism/
 | LittleFS for web UI storage | Separate HTML/CSS/JS files; easier to edit; requires `pio run -t uploadfs` | 2026-02-20 |
 | WebSocket for real-time data | Bidirectional, low-latency; 10 Hz status JSON + command JSON; ESPAsyncWebServer | 2026-02-20 |
 | Full test controls in web UI | Motors + IMU + serial CLI mirror; replaces need for USB serial in most cases | 2026-02-20 |
+| Motor 2 negated in LevelingController | Lead screw physically reversed; negate steps at controller level | 2026-02-20 |
+| Test GUI auto-connect to test mode | Auto-sends admin + mpos on connect for immediate dashboard readout | 2026-02-20 |
 
 ## Known Issues & Bugs
 
