@@ -52,7 +52,7 @@ MotorCorrection LevelingController::calculate(float pitch, float roll) {
     // Roll positive = platform tilted right = M1 raises, M2 lowers
 
     correction.motor1Steps = (int)(pitchOutput - rollOutput);
-    correction.motor2Steps = (int)(pitchOutput + rollOutput);
+    correction.motor2Steps = -(int)(pitchOutput + rollOutput);  // Negated: M2 lead screw is physically reversed
 
     return correction;
 }

@@ -49,8 +49,8 @@ class TestModeGUI:
         self.live_roll = 0.0
         self.live_m1_pos = 0
         self.live_m2_pos = 0
-        self.motor_min = -2048
-        self.motor_max = 2048
+        self.motor_min = 0
+        self.motor_max = 70000
 
         self.setup_ui()
         self.refresh_ports()
@@ -653,6 +653,10 @@ class TestModeGUI:
             self.connect_btn.config(text="Disconnect")
             self.status_label.config(text="● Connected", foreground="green")
             self.log_output(f"Connected to {port} at {baud} baud\n")
+
+            # Auto-enter test mode and query motor positions
+            self.root.after(500, lambda: self.send_command("admin"))
+            self.root.after(1500, lambda: self.send_command("mpos"))
 
         except Exception as e:
             messagebox.showerror("Connection Error", str(e))
