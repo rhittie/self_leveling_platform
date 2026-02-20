@@ -34,7 +34,12 @@ self_leveing_prism/
 │   ├── StepperController/             # Dual stepper motor control
 │   ├── LevelingController/            # PI control loop for leveling
 │   ├── ButtonHandler/                 # Debounced button with short/long press
-│   └── StatusLED/                     # LED patterns for state feedback
+│   ├── StatusLED/                     # LED patterns for state feedback
+│   └── WebDashboard/                  # WiFi AP + WebSocket server + command handler
+├── data/                              # Web UI files (LittleFS → upload with `pio run -t uploadfs`)
+│   ├── index.html                     # 4-tab SPA (Dashboard, Test Mode, Motor Limits, Terminal)
+│   ├── style.css                      # Dark theme responsive styles
+│   └── app.js                         # WebSocket client + all UI logic
 ├── WIRING_DIAGRAM.md                  # Text-based wiring reference (311 lines)
 ├── wiring_diagram.pen                 # Visual wiring diagram (Pencil format)
 ├── hardware_components                # Hardware reference info
@@ -73,21 +78,17 @@ self_leveing_prism/
 - [x] RGB LED status indicator in push button
 - [x] Motor 2 coil wiring corrected (pin order 16,13,15,4)
 - [x] Motor limits GUI with direct serial, both-motors control, M2 direction fix
-
-**What's Uncommitted (in working tree):**
-- [x] Motor position persistence via ESP32 NVS (Preferences library) — saves/loads on boot
-- [x] `setPosition1()`/`setPosition2()` methods in StepperController
-- [x] `ledtest` serial command for raw GPIO LED testing (common anode detection)
-
+- [x] Motor position persistence via ESP32 NVS (Preferences library)
 - [x] Motor 2 direction fixed in leveling controller (lead screw reversal)
-- [x] Test GUI auto-enters test mode and queries mpos on connect
-- [x] Full closed-loop leveling verified working!
+- [x] Full closed-loop leveling verified working
+- [x] Runtime-configurable stability timeout (`st <sec>` command, default 3s)
+- [x] Web dashboard at 192.168.4.1 — Dashboard, Test Mode, Motor Limits, Serial Terminal tabs
+- [x] WebSocket 10 Hz real-time status + full bidirectional command control
 
 **What's In Progress:**
 - (none)
 
 **What's Broken/Known Gaps:**
-- Motor 2 direction inversion only in GUI — leveling controller doesn't invert M2 yet
 - Motor limits (MIN=0, MAX=70000) are placeholders — need real values from physical testing
 
 ## Completed Features
@@ -105,16 +106,17 @@ self_leveing_prism/
 11. Complementary filter alpha 0.02→0.15 for faster convergence - 2026-02-06
 12. Motor 2 coil wiring fix (pin order 16,13,15,4) - 2026-02-19
 13. Motor limits GUI rewrite: direct serial, both-motors control, M2 direction fix - 2026-02-19
+14. Runtime-configurable stability lockout timer (`st` command) - 2026-02-20
+15. Web dashboard: 4-tab WiFi UI with real-time WebSocket, full test controls - 2026-02-20
+16. Motor 2 direction fix in leveling controller + NVS motor position persistence - 2026-02-20
 
 ## Next Steps
 
-1. [ ] Commit uncommitted work (NVS persistence, ledtest, setPosition methods, M2 direction fix)
-2. [ ] Configurable stability lockout timer — `st <sec>` serial command, default 3s (015)
-3. [ ] Safe shutdown on long press — save motor positions to NVS, enter low-power mode (013)
-4. [ ] Web dashboard & test mode portal — ESP32 AP mode, LittleFS, WebSocket (014, ~3-5 sessions)
-5. [ ] Find and set motor limits using GUI (IN/OUT positions for both motors) (011)
-6. [ ] Full closed-loop leveling test with button press (012)
-7. [ ] Set up Notion sync (optional - requires API key)
+1. [ ] Safe shutdown on long press — save motor positions to NVS, enter low-power mode (013)
+2. [ ] Find and set motor limits using web dashboard (IN/OUT positions for both motors) (011)
+3. [ ] Update config.h with final MOTOR_MIN/MAX_POSITION values
+4. [ ] Full closed-loop leveling test with button press (012)
+5. [ ] Set up Notion sync (optional - requires API key)
 
 ## Decisions Made
 
@@ -154,32 +156,24 @@ self_leveing_prism/
 **Last Session:** 2026-02-20
 
 **What We Were Working On:**
-Planning session — captured stability lockout timer, safe shutdown, and web dashboard feature requests. Fleshed out all roadmap files.
+Built and deployed the full web dashboard (014) and stability lockout timer (015). Cleaned up roadmap.
 
 **Where We Left Off:**
-1. **Uncommitted code in working tree** — Motor position NVS persistence, `setPosition1()`/`setPosition2()`, `ledtest` command, Motor 2 direction fix in leveling controller, test GUI auto-connect. Commit these first.
-2. **New feature: Stability Lockout Timer (015)** — Make `STABILITY_TIMEOUT_MS` runtime-configurable via `st <seconds>` serial command. Default 3s. Quick win — only touches types.h and main.cpp. See `roadmap/planned/015-stability-lockout-timer.md`.
-3. **New feature: Safe Shutdown (013)** — Long press → save motor positions to NVS → safe power-off mode. NVS code already exists. See `roadmap/planned/013-safe-shutdown.md`.
-4. **New feature: Web Dashboard (014)** — ESP32 WiFi AP, LittleFS web UI, WebSocket real-time data + full test controls. See `roadmap/planned/014-web-dashboard.md`. ~3-5 sessions.
-5. **Planned features 011/012** — Find motor limits + closed-loop leveling test, fully detailed.
+All code committed and pushed. Web dashboard deployed to ESP32 (firmware + LittleFS). Everything working.
 
 **What Needs to Happen Next:**
-- Commit the uncommitted code first
-- Build 015 (stability lockout timer) — very quick, ~30 min
 - Build 013 (safe shutdown) — quick win, NVS code already exists
-- Start 014 (web dashboard) — major feature, ~3-5 sessions
-- Find motor limits (011) and full leveling test (012) when hardware testing
+- Find motor limits (011) using web dashboard Motor Limits tab — hardware testing
+- Full closed-loop leveling test (012) after limits are set
 
 **Important Context:**
 - PlatformIO ESP32 project. Build with `pio run`, upload with `pio run -t upload`.
-- LittleFS upload: `pio run -t uploadfs` (files in `data/` folder)
-- Motor limits GUI: `python tools/motor_limits_gui.py`
+- LittleFS upload: `pio run -t uploadfs` (web files in `data/` folder)
+- Web dashboard: connect to "LevelingPrism" WiFi, open http://192.168.4.1
+- Motor limits GUI (serial): `python tools/motor_limits_gui.py`
 - Current config.h limits: MIN=0, MAX=70000 (placeholder, needs real values from testing)
-- NVS persistence code already exists in uncommitted main.cpp
 - Closed-loop leveling verified working (Motor 2 direction fixed in leveling controller)
-- `STABILITY_TIMEOUT_MS` is currently 3000ms compile-time; 015 makes it runtime
-- Web dashboard libraries needed: ESPAsyncWebServer, AsyncTCP, ArduinoJson
-- ESP32 AP default IP: 192.168.4.1
+- Stability timeout now runtime-configurable via `st <sec>` command or web dashboard
 
 ---
 
